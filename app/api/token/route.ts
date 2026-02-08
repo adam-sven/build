@@ -47,154 +47,55 @@ async function fetchDexscreener(mint: string) {
 	}
 }
 
-type HolderCountResult = { count: number | null; source: "helius" | "solscan" | null };
-type TopHoldersResult = { top10Pct: number | null; topHolders: { wallet: string; pct: number }[] };
-
-async function fetchHolderCountFromSolscan(mint: string): Promise<number | null> {
-	try {
-		const res = await fetch(
-			`https://api.solscan.io/token/meta?tokenAddress=${mint}`,
-			{ headers: { Accept: "application/json" } },
-		);
-		if (!res.ok) {
-			console.log("[token-api] Solscan HTTP error:", res.status);
-			return null;
-		}
-		const data = await res.json();
-		const count = data?.holder ?? null;
-		return count !== null && count !== undefined ? Number.parseInt(String(count), 10) : null;
-	} catch (e) {
-		console.error("[token-api] Solscan error:", e);
-		return null;
-	}
-}
-
-async function fetchTopHoldersFromRpc(mint: string): Promise<TopHoldersResult> {
-	try {
-		const apiKey = process.env.HELIUS_API_KEY;
-		const rpcUrl = apiKey
-			? `https://mainnet.helius-rpc.com/?api-key=${apiKey}`
-			: "https://api.mainnet-beta.solana.com";
-		const [largestRes, supplyRes] = await Promise.all([
-			fetch(rpcUrl, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: "largest-accounts",
-					method: "getTokenLargestAccounts",
-					params: [mint],
-				}),
-			}),
-			fetch(rpcUrl, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: "token-supply",
-					method: "getTokenSupply",
-					params: [mint],
-				}),
-			}),
-		]);
-
-		if (!largestRes.ok || !supplyRes.ok) {
-			console.log("[token-api] RPC error:", largestRes.status, supplyRes.status);
-			return { top10Pct: null, topHolders: [] };
-		}
-
-		const [largestData, supplyData] = await Promise.all([
-			largestRes.json(),
-			supplyRes.json(),
-		]);
-
-		const supply = supplyData?.result?.value?.uiAmount;
-		const largest = largestData?.result?.value || [];
-
-		if (!supply || !Array.isArray(largest) || largest.length === 0) {
-			return { top10Pct: null, topHolders: [] };
-		}
-
-		const topN = largest.slice(0, 10);
-		const topSum = topN.reduce((sum: number, item: { uiAmount: number | null }) => {
-			return sum + (item.uiAmount || 0);
-		}, 0);
-
-		const top10Pct = (topSum / supply) * 100;
-		const topHolders = topN.map((item: { address: string; uiAmount: number | null }) => ({
-			wallet: item.address,
-			pct: supply > 0 ? ((item.uiAmount || 0) / supply) * 100 : 0,
-		}));
-
-		return { top10Pct, topHolders };
-	} catch (e) {
-		console.error("[token-api] RPC top holders error:", e);
-		return { top10Pct: null, topHolders: [] };
-	}
-}
-
 // ── Holder count (Helius DAS API) ──────────────────────────────────
-async function fetchHolderCount(mint: string): Promise<HolderCountResult> {
+async function fetchHolderCount(mint: string): Promise<number | null> {
 	const apiKey = process.env.HELIUS_API_KEY;
 	if (!apiKey) {
-		return { count: await fetchHolderCountFromSolscan(mint), source: "solscan" };
+		console.log("[token-api] No HELIUS_API_KEY set");
+		return null;
 	}
 
+	// Use the correct Helius DAS getTokenAccounts endpoint
 	try {
 		const url = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
-		const limit = 1000;
-		const maxPages = 20;
-		let page = 1;
-		const owners = new Set<string>();
+		console.log("[token-api] Fetching holders via Helius DAS for:", mint);
 
-		while (page <= maxPages) {
-			const res = await fetch(url, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					jsonrpc: "2.0",
-					id: `holder-count-${page}`,
-					method: "getTokenAccounts",
-					params: {
-						mint: mint,
-						page,
-						limit,
-						options: {},
-					},
-				}),
-			});
+		const res = await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: "holder-count",
+				method: "getTokenAccounts",
+				params: {
+					mint: mint,
+					limit: 1,
+					options: {},
+				},
+			}),
+		});
 
-			if (!res.ok) {
-				return { count: await fetchHolderCountFromSolscan(mint), source: "solscan" };
-			}
-
-			const data = await res.json();
-			if (data?.error) {
-				return { count: await fetchHolderCountFromSolscan(mint), source: "solscan" };
-			}
-
-			const accounts = data?.result?.token_accounts;
-			const pageCount = Array.isArray(accounts) ? accounts.length : 0;
-			if (Array.isArray(accounts)) {
-				for (const acct of accounts) {
-					if (acct?.owner) owners.add(acct.owner);
-				}
-			}
-
-			if (pageCount < limit) {
-				break;
-			}
-			page += 1;
+		if (!res.ok) {
+			console.log("[token-api] Helius DAS HTTP error:", res.status);
+			return null;
 		}
 
-		if (owners.size > 0) {
-			return { count: owners.size, source: "helius" };
+		const data = await res.json();
+		console.log("[token-api] Helius DAS response total:", data?.result?.total);
+
+		if (data?.result?.total !== undefined) {
+			return data.result.total;
 		}
 
-		return { count: await fetchHolderCountFromSolscan(mint), source: "solscan" };
+		// Fallback: count token_accounts length
+		if (data?.result?.token_accounts) {
+			return data.result.token_accounts.length;
+		}
+
+		return null;
 	} catch (e) {
 		console.error("[token-api] Helius DAS error:", e);
-		return { count: await fetchHolderCountFromSolscan(mint), source: "solscan" };
+		return null;
 	}
 }
 
@@ -281,11 +182,17 @@ async function fetchTokenIntel(mint: string): Promise<TokenIntelResponse> {
 	try {
 		console.log("[token-api] === Starting fetch for:", mint, "===");
 
-		const [dex, holderResult, topHoldersResult] = await Promise.all([
+		const [dex, holderCount] = await Promise.all([
 			fetchDexscreener(mint),
 			fetchHolderCount(mint),
-			fetchTopHoldersFromRpc(mint),
 		]);
+
+		console.log(
+			"[token-api] Results - dex:",
+			!!dex,
+			"holderCount:",
+			holderCount,
+		);
 
 		const market = dex?.market || {
 			priceUsd: null,
@@ -307,17 +214,17 @@ async function fetchTokenIntel(mint: string): Promise<TokenIntelResponse> {
 			socials: { twitter: null, website: null, telegram: null },
 			market,
 			holders: {
-				holderCount: holderResult.count ?? null,
-				top10Pct: topHoldersResult.top10Pct ?? null,
-				topHolders: topHoldersResult.topHolders,
+				holderCount: holderCount ?? null,
+				top10Pct: null,
+				topHolders: [],
 			},
 			candles: { interval: "1h" as const, items: [] },
 			signals,
-			verdict: calcVerdict(market, holderResult.count, signals),
+			verdict: calcVerdict(market, holderCount, signals),
 			sources: {
 				dexscreener: !!dex,
 				birdeye: false,
-				helius: holderResult.source === "helius",
+				helius: holderCount !== null,
 			},
 		};
 
