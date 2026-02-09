@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildSmartWalletSnapshot, getSmartWalletSnapshot } from "@/lib/smart-wallets";
+import { runLiveRefresh } from "@/lib/trencher/live";
 
 const RATE_LIMIT_WINDOW = 60_000;
 const RATE_LIMIT_MAX = 80;
@@ -160,6 +161,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const force = request.nextUrl.searchParams.get("force") === "1";
+    if (!force) {
+      await runLiveRefresh("solana", "smart");
+    }
     if (force) {
       const data = await buildSmartWalletSnapshot(true);
       const hydrated = await hydrateTopMintMeta(data);

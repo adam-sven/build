@@ -119,21 +119,26 @@ export default function SmartWalletsPage() {
   useEffect(() => {
     let ignore = false;
 
-    const load = async (force = false) => {
-      setLoading(true);
+    const load = async (force = false, silent = false) => {
+      if (!silent) setLoading(true);
       try {
+        try {
+          await fetch(`/api/live/tick?chain=solana&scope=smart`, { cache: "no-store" });
+        } catch {
+          // ignore
+        }
         const res = await fetch(`/api/smart-wallets${force ? '?force=1' : ''}`);
         const json: SmartWalletSnapshot = await res.json();
         if (!ignore && json?.ok) {
           setData(json);
         }
       } finally {
-        if (!ignore) setLoading(false);
+        if (!ignore && !silent) setLoading(false);
       }
     };
 
     load();
-    const interval = setInterval(load, 90_000);
+    const interval = setInterval(() => load(false, true), 20_000);
 
     return () => {
       ignore = true;

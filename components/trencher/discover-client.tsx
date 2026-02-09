@@ -70,19 +70,33 @@ export default function DiscoverClient() {
   const [items, setItems] = useState<TokenRowSummary[]>([]);
   const [voteTarget, setVoteTarget] = useState<{ mint: string; direction: "up" | "down" } | null>(null);
 
-  const load = async (m: DiscoverMode) => {
-    setLoading(true);
+  const load = async (m: DiscoverMode, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch(`/api/ui/discover?chain=solana&mode=${m}`);
       const json: DiscoverResponse = await res.json();
       if (json?.ok) setItems(json.items);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     load(mode);
+  }, [mode]);
+
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      try {
+        await fetch(`/api/live/tick?chain=solana&scope=discover`, { cache: "no-store" });
+      } catch {
+        // ignore
+      }
+      await load(mode, true);
+    }, 12_000);
+
+    return () => clearInterval(timer);
   }, [mode]);
 
   const filtered = useMemo(() => {

@@ -86,9 +86,14 @@ export default function DashboardClient() {
   const [intel, setIntel] = useState<TokenResponse | null>(null);
   const [intelLoading, setIntelLoading] = useState(false);
 
-  const loadDashboard = async () => {
-    setLoading(true);
+  const loadDashboard = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
+      try {
+        await fetch("/api/live/tick?chain=solana&scope=all", { cache: "no-store" });
+      } catch {
+        // ignore
+      }
       const [discoverRes, smartRes] = await Promise.all([
         fetch("/api/ui/discover?chain=solana&mode=trending"),
         fetch("/api/smart-wallets"),
@@ -97,7 +102,7 @@ export default function DashboardClient() {
       if (discoverJson?.ok) setDiscover(discoverJson);
       if (smartJson?.ok) setSmart(smartJson);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -115,6 +120,11 @@ export default function DashboardClient() {
 
   useEffect(() => {
     loadDashboard();
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      loadDashboard(true);
+    }, 15_000);
+    return () => clearInterval(timer);
   }, []);
 
   const topTokens = useMemo(() => (discover?.items || []).slice(0, 5), [discover]);
@@ -138,7 +148,7 @@ export default function DashboardClient() {
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-white/60">Market overview + smart wallets + quick Intel in one screen.</p>
         </div>
-        <Button onClick={loadDashboard} variant="outline" className="border-white/20 text-white/80">
+        <Button onClick={() => loadDashboard()} variant="outline" className="border-white/20 text-white/80">
           Refresh Data
         </Button>
       </div>
