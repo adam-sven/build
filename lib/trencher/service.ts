@@ -65,9 +65,17 @@ async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
   return [...out];
 }
 
-export async function buildToken(chain: Chain, mint: string, interval: Interval = "1h"): Promise<TokenResponse> {
-  const cached = await getCachedToken<TokenResponse>(chain, mint);
-  if (cached) return cached;
+export async function buildToken(
+  chain: Chain,
+  mint: string,
+  interval: Interval = "1h",
+  options?: { includeHolders?: boolean },
+): Promise<TokenResponse> {
+  const includeHolders = options?.includeHolders !== false;
+  if (includeHolders) {
+    const cached = await getCachedToken<TokenResponse>(chain, mint);
+    if (cached) return cached;
+  }
 
   const [marketData, holders, votes, search, peak, candles] = await Promise.all([
     marketProvider
@@ -86,7 +94,9 @@ export async function buildToken(chain: Chain, mint: string, interval: Interval 
           dex: null,
         },
       })),
-    getHolderStats(mint),
+    includeHolders
+      ? getHolderStats(mint)
+      : Promise.resolve({ holderCount: null, top10Pct: null, topHolders: [] }),
     getVotes24h(chain, mint),
     getSearchCounts(chain, mint),
     getTokenPeak(chain, mint),
@@ -155,7 +165,9 @@ export async function buildToken(chain: Chain, mint: string, interval: Interval 
     peakUpvotes24h: Math.max(peak.peakUpvotes24h, votes.up24h),
   });
 
-  await cacheToken(chain, mint, payload, 45);
+  if (includeHolders) {
+    await cacheToken(chain, mint, payload, 45);
+  }
   return payload;
 }
 
@@ -251,7 +263,7 @@ export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promi
     const tokens = await Promise.all(
       sampled.map(async (mint) => {
         try {
-          return await buildToken(chain, mint, "1h");
+          return await buildToken(chain, mint, "1h", { includeHolders: false });
         } catch {
           return null;
         }

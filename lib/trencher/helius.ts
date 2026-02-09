@@ -1,4 +1,13 @@
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+const HOLDER_STATS_TTL_MS = Number(process.env.HOLDER_STATS_TTL_MS || `${15 * 60 * 1000}`);
+const HOLDER_COUNT_MAX_PAGES = Number(process.env.HOLDER_COUNT_MAX_PAGES || "3");
+const holderStatsCache = new Map<
+  string,
+  {
+    at: number;
+    data: { holderCount: number | null; top10Pct: number | null; topHolders: { wallet: string; pct: number }[] };
+  }
+>();
 
 export function getConnection() {
   const rpcUrl =
@@ -14,6 +23,10 @@ export async function getHolderStats(mint: string): Promise<{
   top10Pct: number | null;
   topHolders: { wallet: string; pct: number }[];
 }> {
+  const cached = holderStatsCache.get(mint);
+  if (cached && Date.now() - cached.at < HOLDER_STATS_TTL_MS) {
+    return cached.data;
+  }
   try {
     const conn = getConnection();
     const [largest, supply] = await Promise.all([
@@ -39,7 +52,7 @@ export async function getHolderStats(mint: string): Promise<{
         let page = 1;
         const limit = 1000;
         const owners = new Set<string>();
-        while (page <= 10) {
+        while (page <= HOLDER_COUNT_MAX_PAGES) {
           const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -65,7 +78,9 @@ export async function getHolderStats(mint: string): Promise<{
       }
     }
 
-    return { holderCount, top10Pct, topHolders };
+    const out = { holderCount, top10Pct, topHolders };
+    holderStatsCache.set(mint, { at: Date.now(), data: out });
+    return out;
   } catch {
     return { holderCount: null, top10Pct: null, topHolders: [] };
   }

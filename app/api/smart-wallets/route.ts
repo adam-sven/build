@@ -7,6 +7,8 @@ const RATE_LIMIT_MAX = 80;
 const rateLimitStore = new Map<string, { count: number; start: number }>();
 let jupMap: Map<string, any> | null = null;
 let jupFetchedAt = 0;
+const HYDRATE_CACHE_TTL_MS = Number(process.env.SMART_HYDRATE_TTL_MS || "120000");
+let hydratedCache: { at: number; fingerprint: string; data: any } | null = null;
 
 function getIp(request: NextRequest): string {
   const fwd = request.headers.get("x-forwarded-for");
@@ -106,44 +108,16 @@ async function hydrateTopMintMeta(data: any) {
       continue;
     }
 
-    try {
-      const apiKey = process.env.HELIUS_API_KEY;
-      if (apiKey) {
-        const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: "getAsset",
-            method: "getAsset",
-            params: { id: mint },
-          }),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          const result = json?.result;
-          const image =
-            result?.content?.files?.find((f: any) => typeof f?.cdn_uri === "string")?.cdn_uri ||
-            result?.content?.files?.find((f: any) => typeof f?.uri === "string")?.uri ||
-            null;
-          const name = result?.content?.metadata?.name || null;
-          const symbol = result?.content?.metadata?.symbol || null;
-          if (name || symbol || image) {
-            row.token = {
-              ...row.token,
-              name: row.token?.name || name,
-              symbol: row.token?.symbol || symbol,
-              image: row.token?.image || image,
-            };
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
+    // Intentionally skip Helius getAsset fallback here to avoid per-request RPC burn.
   }
 
   return data;
+}
+
+function getSnapshotFingerprint(data: any): string {
+  const ts = String(data?.timestamp || "");
+  const top = Array.isArray(data?.topMints) ? data.topMints.slice(0, 12) : [];
+  return `${ts}:${top.map((m: any) => m?.mint || "").join(",")}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -162,7 +136,7 @@ export async function GET(request: NextRequest) {
   try {
     const force = request.nextUrl.searchParams.get("force") === "1";
     if (!force) {
-      await runLiveRefresh("solana", "smart");
+      void runLiveRefresh("solana", "smart");
     }
     if (force) {
       const data = await buildSmartWalletSnapshot(true);
@@ -176,12 +150,31 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, stale, source } = await getSmartWalletSnapshot();
+    const fp = getSnapshotFingerprint(data);
+    const now = Date.now();
+    if (
+      hydratedCache &&
+      hydratedCache.fingerprint === fp &&
+      now - hydratedCache.at < HYDRATE_CACHE_TTL_MS
+    ) {
+      return NextResponse.json(hydratedCache.data, {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+          "X-Smart-Stale": stale ? "1" : "0",
+          "X-Smart-Source": source,
+          "X-Smart-Hydrate": "cache",
+        },
+      });
+    }
+
     const hydrated = await hydrateTopMintMeta(data);
+    hydratedCache = { at: now, fingerprint: fp, data: hydrated };
     return NextResponse.json(hydrated, {
       headers: {
         "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
         "X-Smart-Stale": stale ? "1" : "0",
         "X-Smart-Source": source,
+        "X-Smart-Hydrate": "fresh",
       },
     });
   } catch (error) {

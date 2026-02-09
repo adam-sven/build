@@ -69,13 +69,13 @@ export type SmartWalletSnapshot = {
   };
 };
 
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = Number(process.env.SMART_CACHE_TTL_MS || `${10 * 60 * 1000}`);
 let cache: { timestamp: number; data: SmartWalletSnapshot } | null = null;
 let refreshPromise: Promise<SmartWalletSnapshot> | null = null;
 
-const SIGNATURES_LIMIT = 14;
-const MAX_TX_PER_WALLET = 12;
-const CONCURRENCY = 5;
+const SIGNATURES_LIMIT = Number(process.env.SMART_SIGNATURES_LIMIT || "6");
+const MAX_TX_PER_WALLET = Number(process.env.SMART_MAX_TX_PER_WALLET || "4");
+const CONCURRENCY = Number(process.env.SMART_RPC_CONCURRENCY || "3");
 const TOKEN_METADATA_LIMIT = 80;
 const TOKEN_METADATA_CONCURRENCY = 8;
 const TOKEN_META_TTL = 10 * 60 * 1000;

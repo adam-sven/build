@@ -11,7 +11,7 @@ const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
   new: 45_000,
   quality: 60_000,
 };
-const SMART_REFRESH_MS = 45_000;
+const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || "300000");
 const LIVE_LOCK_KEY = "trencher:live:refresh:lock";
 
 const DISCOVER_AT_KEY = (chain: Chain, mode: DiscoverMode) => `trencher:live:discover:at:${chain}:${mode}`;
@@ -61,7 +61,7 @@ export async function runLiveRefresh(chain: Chain, scope: LiveScope = "all") {
     }
 
     if (needSmart) {
-      await buildSmartWalletSnapshot(true);
+      await buildSmartWalletSnapshot(false);
       await kvSet(SMART_AT_KEY, Date.now(), 3600);
     }
 
