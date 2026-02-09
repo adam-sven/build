@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSmartWalletSnapshot } from "@/lib/smart-wallets";
+import { getStoredSmartSnapshotFromEvents } from "@/lib/trencher/helius-ingest";
 
 type WalletBuy = {
   mint: string;
@@ -50,7 +51,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     return NextResponse.json({ ok: false, error: "invalid_wallet" }, { status: 400 });
   }
 
-  const { data } = await getSmartWalletSnapshot();
+  const webhookSnapshot = process.env.SMART_USE_WEBHOOK_EVENTS !== "false"
+    ? await getStoredSmartSnapshotFromEvents()
+    : null;
+  const { data } = webhookSnapshot
+    ? { data: webhookSnapshot }
+    : await getSmartWalletSnapshot();
   const activity = (data.activity || []).find((x) => x.wallet === wallet);
   if (!activity) {
     return NextResponse.json({ ok: false, error: "wallet_not_found" }, { status: 404 });

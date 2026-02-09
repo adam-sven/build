@@ -422,6 +422,65 @@ export default function Page() {
           ]
         }
       ]
+    },
+    {
+      id: 7,
+      title: 'Experiment #7 — Helius webhook ingest + always-on worker (v1.4)',
+      date: '2026-02-09',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Added secure webhook ingest endpoint `/api/ingest/helius` for pushed wallet activity events.',
+            'Added Redis-backed event store + webhook-derived smart snapshot cache for Smart Wallets.',
+            'Updated live tick path to prefer webhook snapshot refresh and use RPC polling only as fallback.',
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'Polling many wallets directly against RPC was burning credits too fast. This update moves toward push-first ingestion so refreshes are cheaper and more stable under traffic.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Helius webhook payloads are parsed into normalized buy events (`wallet`, `mint`, `signature`, `solDelta`, `blockTime`).',
+            'Events are deduplicated and stored in Redis with TTL.',
+            'Smart-wallet snapshot is rebuilt from stored events and cached in Redis for UI/API reads.',
+            '`/api/smart-wallets` and `/api/smart-wallets/wallet/:wallet` now prefer webhook snapshot data first.',
+            'Live worker (`pnpm worker:live`) keeps discover/smart caches warm and lock-protected without per-user refresh spikes.',
+            'Endpoint supports `HELIUS_WEBHOOK_SECRET` via bearer header or `?secret=` query for provider integration.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not full on-chain indexing of all Solana activity.',
+            'Not guaranteed complete metadata for every fresh mint.',
+            'Not sub-second websocket UX yet.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'If webhook is misconfigured or silent, system falls back to older polling path.',
+            'Metadata/chart quality still depends on external market data provider coverage.',
+            'Wallet PnL remains sampled proxy logic, not full accounting.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Move discovery candidate generation to webhook-driven mint deltas so refresh cycles only score changed tokens instead of broad rescans.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/api/ingest/helius',
+            '/api/smart-wallets',
+            '/api/live/tick',
+            'scripts/live-worker.mjs'
+          ]
+        }
+      ]
     }
   ];
 

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildSmartWalletSnapshot, getSmartWalletSnapshot } from "@/lib/smart-wallets";
 import { runLiveRefresh } from "@/lib/trencher/live";
+import {
+  getStoredSmartSnapshotFromEvents,
+  refreshAndStoreSmartSnapshotFromEvents,
+} from "@/lib/trencher/helius-ingest";
 
 const RATE_LIMIT_WINDOW = 60_000;
 const RATE_LIMIT_MAX = 80;
@@ -135,9 +139,40 @@ export async function GET(request: NextRequest) {
 
   try {
     const force = request.nextUrl.searchParams.get("force") === "1";
+    const webhookMode = process.env.SMART_USE_WEBHOOK_EVENTS !== "false";
     if (!force) {
       void runLiveRefresh("solana", "smart");
     }
+
+    if (webhookMode) {
+      if (force) {
+        const refreshed = await refreshAndStoreSmartSnapshotFromEvents();
+        if (refreshed) {
+          const hydrated = await hydrateTopMintMeta(refreshed);
+          return NextResponse.json(hydrated, {
+            headers: {
+              "Cache-Control": "no-store, max-age=0",
+              "X-Smart-Cache": "force-refresh",
+              "X-Smart-Source": "webhook",
+            },
+          });
+        }
+      }
+
+      const cachedWebhook = await getStoredSmartSnapshotFromEvents();
+      if (cachedWebhook) {
+        const hydrated = await hydrateTopMintMeta(cachedWebhook);
+        return NextResponse.json(hydrated, {
+          headers: {
+            "Cache-Control": "public, s-maxage=20, stale-while-revalidate=120",
+            "X-Smart-Stale": "0",
+            "X-Smart-Source": "webhook",
+            "X-Smart-Hydrate": "fresh",
+          },
+        });
+      }
+    }
+
     if (force) {
       const data = await buildSmartWalletSnapshot(true);
       const hydrated = await hydrateTopMintMeta(data);

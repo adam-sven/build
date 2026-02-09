@@ -2,6 +2,7 @@ import { buildSmartWalletSnapshot } from "@/lib/smart-wallets";
 import { kvDel, kvGet, kvSet, kvSetNx } from "@/lib/trencher/kv";
 import { buildDiscoverFeed } from "@/lib/trencher/service";
 import type { Chain, DiscoverMode } from "@/lib/trencher/types";
+import { refreshAndStoreSmartSnapshotFromEvents } from "@/lib/trencher/helius-ingest";
 
 type LiveScope = "discover" | "smart" | "all";
 
@@ -61,7 +62,15 @@ export async function runLiveRefresh(chain: Chain, scope: LiveScope = "all") {
     }
 
     if (needSmart) {
-      await buildSmartWalletSnapshot(false);
+      const useWebhookEvents = process.env.SMART_USE_WEBHOOK_EVENTS !== "false";
+      if (useWebhookEvents) {
+        const fromEvents = await refreshAndStoreSmartSnapshotFromEvents();
+        if (!fromEvents) {
+          await buildSmartWalletSnapshot(false);
+        }
+      } else {
+        await buildSmartWalletSnapshot(false);
+      }
       await kvSet(SMART_AT_KEY, Date.now(), 3600);
     }
 

@@ -29,6 +29,7 @@ KV_REST_API_URL=
 KV_REST_API_TOKEN=
 CRON_SECRET=
 LIVE_TICK_SECRET=
+HELIUS_WEBHOOK_SECRET=
 REDIS_URL=
 REDIS_TLS=true
 API_KEYS=key1,key2
@@ -39,6 +40,9 @@ SMART_MAX_TX_PER_WALLET=4
 SMART_RPC_CONCURRENCY=3
 SMART_CACHE_TTL_MS=600000
 SMART_HYDRATE_TTL_MS=120000
+SMART_USE_WEBHOOK_EVENTS=true
+SMART_EVENT_TTL_SEC=86400
+SMART_EVENT_SNAPSHOT_TTL_SEC=1200
 HOLDER_STATS_TTL_MS=900000
 HOLDER_COUNT_MAX_PAGES=3
 DISCOVER_MIN_LIQUIDITY_USD=12000
@@ -109,6 +113,29 @@ pnpm worker:live
 ```
 
 The worker is lightweight and refreshes shared Redis cache behind a lock, so all users read the same hot data without per-user heavy RPC spikes.
+
+## Helius webhook ingest (recommended)
+
+Use Helius Enhanced Webhooks to push wallet events into Trencher so smart-wallet data is driven by event ingest, not repeated wallet polling.
+
+1. Set env:
+- `HELIUS_WEBHOOK_SECRET=<long-random-secret>`
+- `SMART_USE_WEBHOOK_EVENTS=true`
+
+2. In Helius, create webhook URL:
+
+```text
+https://your-domain.com/api/ingest/helius?secret=<HELIUS_WEBHOOK_SECRET>
+```
+
+3. Webhook endpoint:
+- `POST /api/ingest/helius`
+- Also supports `Authorization: Bearer <HELIUS_WEBHOOK_SECRET>` if you prefer header auth.
+
+4. Result:
+- Incoming events are stored in Redis.
+- Smart-wallet snapshot is rebuilt from event stream and served from cache.
+- RPC polling remains as fallback only if webhook snapshot is empty.
 
 ## Pages
 
