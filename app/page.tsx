@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/lib/use-wallet';
 
@@ -12,6 +12,8 @@ export default function Page() {
   const { connected, publicKey, connect, disconnect, loading, phantomInstalled } = useWallet();
   const [hasAccess, setHasAccess] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [openEntryId, setOpenEntryId] = useState<number | null>(3);
 
   // Check token access in one place for easy future SPL token balance check
   const checkAccess = async (wallet: string): Promise<boolean> => {
@@ -88,63 +90,178 @@ export default function Page() {
       sections: [
         {
           heading: 'What shipped',
-          content: 'I shipped the first usable version of Token Intel. It’s a simple Solana token intelligence tool: paste a mint → get a single, high-signal snapshot of what the token is, not where price might go. The same data is exposed in a structured format so agents (bots, scripts, Clawdbot-style tooling) can consume it directly.'
+          content: 'I shipped the first usable version of Token Intel. It is a simple Solana token intelligence tool: paste a mint, get a single high-signal snapshot of the token’s current state. This is not a trading bot, signal service, or price predictor. It is a filter meant to reduce noise, not generate conviction.'
         },
         {
-          heading: 'What it does',
+          heading: 'Why I built this',
+          items: [
+            'Most tools optimize for price, charts, alerts, and engagement loops.',
+            'I wanted the opposite: a fast, static read on what a token is, not where it is going.',
+            'Something both humans and agents/bots can consume easily.',
+            'No scrolling, no dashboards, no dopamine hooks.',
+            'Just: “What am I looking at right now?”'
+          ]
+        },
+        {
+          heading: 'What it does (v1)',
           items: [
             'Resolves token identity (name, symbol, mint)',
-            'Pulls core market context (price, liquidity, volume, FDV, dex)',
-            'Computes lightweight risk/context signals',
-            'Holder count & top-holder concentration',
-            'Volume / liquidity ratio',
-            'Basic bundle & sniper heuristics',
-            'Early/late stage classification',
-            'Presents everything in one readable card for humans',
-            'Exposes the same output as JSON for agents'
+            'Pulls core market context: price, liquidity, volume (24h), FDV, DEX',
+            'Computes lightweight heuristics: holder count, top-holder concentration, volume / liquidity ratio',
+            'Basic bundle detection',
+            'Basic sniper / bot risk flags',
+            'Classifies the token as early / discovery / active',
+            'Presents everything in one readable card',
+            'Exposes the same data as structured JSON for agents'
           ]
         },
         {
-          heading: 'What it does not do',
+          heading: 'What it deliberately does not do',
           items: [
-            'It does not predict price',
-            'It does not tell you to buy or sell',
-            'It does not compete with charting tools',
-            'This is a filter, not a trading oracle',
-            'The goal is to answer: “Is this token worth attention at all?” before you open charts, Twitter, or a terminal.'
+            'No buy/sell signals',
+            'No targets',
+            'No predictions',
+            'No “alpha” framing',
+            'If this tool tells you what to buy, it has failed.'
           ]
         },
         {
-          heading: 'Why this exists',
+          heading: 'Design choices',
           items: [
-            'Most tools either overwhelm with raw data, or collapse everything into a fake “score”.',
-            'I’m testing whether a small number of clearly explained signals, shown together, is more useful than either.'
+            'Snapshot over stream',
+            'Explanation over charts',
+            'Flags over scores',
+            'Human-readable first, machine-readable second',
+            'The UI is intentionally calm. If something looks risky, it should feel obvious, not urgent.'
           ]
         },
         {
           heading: 'Current limitations',
           items: [
-            'Signals are intentionally coarse (v1)',
-            'No discovery feed yet (copy/paste required)',
-            'No historical trends or charts yet',
-            'This is a snapshot, not a dashboard.'
-          ]
-        },
-        {
-          heading: 'What’s next',
-          items: [
-            '/scan feed for passive discovery',
-            'Better explanations/tooltips for each signal',
-            'Hardening the API so agents can rely on it without UI'
+            'No scan/feed yet',
+            'No historical charts',
+            'No wallet-level behavior analysis',
+            'Heuristics are intentionally conservative',
+            'This is a foundation, not a finished product.'
           ]
         },
         {
           heading: 'Status',
-          content: 'Shipped, early, iterating.'
+          content: 'Shipped and live. Usable. Early.'
+        },
+        {
+          heading: 'What’s next',
+          items: [
+            'Validate whether this snapshot format is actually useful for manual filtering',
+            'Validate whether it is useful for bots (Clawdbot-style)',
+            'Test early-stage discovery without chart addiction'
+          ]
+        },
+        {
+          heading: 'If you want, next we can',
+          items: [
+            'Write Experiment #3 (Scan feed / agent API)',
+            'Tighten the wording even more (more austere / more technical)',
+            'Turn this into a pinned README-style “what this is / isn’t” page'
+          ]
+        },
+        {
+          heading: 'Big picture',
+          content: 'This is a real product now. Not finished, but coherent.'
+        }
+      ]
+    },
+    {
+      id: 3,
+      title: 'Experiment #3 — Smart Wallet Feed (v1)',
+      date: '2026-02-09',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Shipped `/smart` as a two-column discovery view: wallet leaderboard on the left, top bought tokens on the right.',
+            'Added `/api/smart-wallets` with wallet and token aggregates for both UI and bot consumers.',
+            'Added 5-minute refresh + stale-while-revalidate caching and a manual refresh action.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'Copy/paste-only flow created too much friction. This tests whether a passive discovery surface improves daily usage and gives agents a reliable candidate generator.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Reads a curated wallet set from `data/smart-wallets.json`.',
+            'Pulls wallet activity from Solana RPC (Helius if configured) and falls back to holdings when transaction parsing is sparse.',
+            'Aggregates to `topWallets` and `topMints` with wallet overlap, buy counts, and sampled SOL net flow.',
+            'Enriches top mints using Dexscreener metadata (name, symbol, liquidity, volume, 24h change, pair URL).',
+            'Exposes one response contract via `/api/smart-wallets` and protects refresh via `/api/smart-wallets/refresh` + `CRON_SECRET`.',
+            'UI auto-polls and stays responsive even when upstream calls are slow through stale-cache delivery.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not a copy-trading engine.',
+            'Not a guaranteed PnL oracle.',
+            'Not real-time tick streaming.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'PnL is a sampled proxy (recent SOL net flow), not a full realized/unrealized ledger.',
+            'Coverage depends on RPC limits and wallet behavior complexity.',
+            'Token metadata quality depends on available Dexscreener pairs.',
+            'Current feed is near-real-time via polling/caching, not websocket streaming.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Add an incremental events endpoint (`/api/smart-wallets/events?since=...`) so bots can consume deltas instead of full snapshots.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/smart',
+            '/api/smart-wallets',
+            '/api/smart-wallets/refresh'
+          ]
         }
       ]
     }
   ];
+
+  const filteredEntries = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return entries;
+
+    return entries.filter((entry) => {
+      const haystack = [
+        entry.title,
+        entry.date,
+        ...entry.sections.map((section) => section.heading),
+        ...entry.sections
+          .map((section) => section.content || '')
+          .filter(Boolean),
+        ...entry.sections.flatMap((section) => section.items || []),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [entries, searchQuery]);
+
+  useEffect(() => {
+    if (filteredEntries.length === 0) {
+      setOpenEntryId(null);
+      return;
+    }
+    if (!filteredEntries.some((entry) => entry.id === openEntryId)) {
+      setOpenEntryId(filteredEntries[0].id);
+    }
+  }, [filteredEntries, openEntryId]);
 
   // Loading state
   if (loading) {
@@ -276,23 +393,59 @@ export default function Page() {
           </p>
         </div>
 
-        <div className="space-y-12 mb-12">
-          {entries.map((entry) => (
+        <div className="mb-8 space-y-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <label htmlFor="log-search" className="text-xs uppercase tracking-widest text-muted-foreground">
+              Search logs
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Showing {filteredEntries.length} of {entries.length}
+            </p>
+          </div>
+          <input
+            id="log-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by keyword, topic, endpoint, experiment..."
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+          />
+        </div>
+
+        <div className="space-y-4 mb-12">
+          {filteredEntries.map((entry) => {
+            const isOpen = openEntryId === entry.id;
+            return (
             <article 
               key={entry.id}
-              className="border-l-2 border-border pl-6 py-4"
+              className="rounded-lg border border-border bg-card/40"
             >
-              <time className="text-xs text-muted-foreground uppercase tracking-widest">
-                {new Date(entry.date).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </time>
-              <h2 className="text-2xl font-semibold mt-4 mb-6">
-                {entry.title}
-              </h2>
-              <div className="space-y-6">
+              <button
+                type="button"
+                onClick={() => setOpenEntryId(isOpen ? null : entry.id)}
+                className="w-full text-left px-4 py-4 border-b border-border/50 hover:bg-card/60 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <time className="text-xs text-muted-foreground uppercase tracking-widest">
+                      {new Date(entry.date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </time>
+                    <h2 className="text-lg md:text-xl font-semibold mt-2">
+                      {entry.title}
+                    </h2>
+                  </div>
+                  <span className="font-mono text-xs text-foreground/70 border border-border rounded px-2 py-1">
+                    {isOpen ? '[-]' : '[+]'}
+                  </span>
+                </div>
+              </button>
+
+              {isOpen && (
+                <div className="space-y-6 px-4 py-4">
                 {entry.sections.map((section, idx) => (
                   <div key={idx}>
                     <h3 className="text-sm font-semibold uppercase tracking-widest text-foreground/70 mb-2">
@@ -314,9 +467,16 @@ export default function Page() {
                     )}
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
             </article>
-          ))}
+            );
+          })}
+          {filteredEntries.length === 0 && (
+            <div className="rounded-lg border border-border bg-card/30 px-4 py-6 text-sm text-muted-foreground">
+              No logs matched your search.
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end pt-8 border-t border-border">

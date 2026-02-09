@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 
@@ -56,14 +56,26 @@ type TokenIntelResponse = {
   error?: string;
 };
 
+type SmartWalletSnapshot = {
+  ok: boolean;
+  timestamp: string;
+  byMint: Record<
+    string,
+    { walletCount: number; buys: { wallet: string; signature: string; blockTime: number | null; amount: number }[] }
+  >;
+};
+
 export default function IntelPage() {
   const [mint, setMint] = useState('');
   const [data, setData] = useState<TokenIntelResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [smartWallets, setSmartWallets] = useState<SmartWalletSnapshot | null>(null);
+  const [smartLoading, setSmartLoading] = useState(false);
 
-  const handleFetch = async () => {
-    if (!mint.trim()) {
+  const handleFetch = async (overrideMint?: string) => {
+    const targetMint = overrideMint?.trim() || mint.trim();
+    if (!targetMint) {
       setError('Please enter a mint address');
       return;
     }
@@ -73,7 +85,7 @@ export default function IntelPage() {
     setData(null);
 
     try {
-      const res = await fetch(`/api/token-intel?mint=${encodeURIComponent(mint.trim())}`);
+      const res = await fetch(`/api/token-intel?mint=${encodeURIComponent(targetMint)}`);
       if (!res.ok) {
         const text = await res.text();
         setError(`API Error: ${res.status} ${text}`);
@@ -95,6 +107,41 @@ export default function IntelPage() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleFetch();
   };
+
+  useEffect(() => {
+    if (!mint.trim()) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('mint', mint.trim());
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  }, [mint]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialMint = params.get('mint');
+    if (initialMint) {
+      setMint(initialMint);
+      handleFetch(initialMint);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const fetchSmartWallets = async () => {
+      if (!data?.mint) return;
+      setSmartLoading(true);
+      try {
+        const res = await fetch('/api/smart-wallets');
+        if (!res.ok) throw new Error('smart-wallets failed');
+        const json: SmartWalletSnapshot = await res.json();
+        setSmartWallets(json);
+      } catch {
+        setSmartWallets(null);
+      } finally {
+        setSmartLoading(false);
+      }
+    };
+    fetchSmartWallets();
+  }, [data?.mint]);
 
   const formatUsd = (val: number | null) => {
     if (val === null) return 'Unavailable';
@@ -129,6 +176,11 @@ export default function IntelPage() {
     return val.toFixed(2);
   };
 
+  const formatBlockTime = (val: number | null) => {
+    if (!val) return '—';
+    return new Date(val * 1000).toLocaleString();
+  };
+
   const shortAddr = (addr: string, start = 6, end = 4) => {
     return `${addr.slice(0, start)}...${addr.slice(-end)}`;
   };
@@ -138,6 +190,11 @@ export default function IntelPage() {
     if (value === 'medium') return 'bg-amber-500/15 text-amber-200 border-amber-400/30';
     return 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30';
   };
+
+  const smartForMint = data?.mint ? smartWallets?.byMint?.[data.mint] : undefined;
+  const smartBuys = smartForMint?.buys
+    ? [...smartForMint.buys].sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0)).slice(0, 5)
+    : [];
 
   return (
     <main className="min-h-screen text-foreground bg-[radial-gradient(1200px_500px_at_10%_-10%,#14213d_0%,transparent_60%),radial-gradient(900px_400px_at_90%_10%,#1f2937_0%,transparent_55%),#05070b]">
@@ -385,6 +442,40 @@ export default function IntelPage() {
                     </div>
                   </div>
                 </details>
+
+                <div className="mt-4">
+                  <div className="text-sm text-white/60">Smart Wallet Activity</div>
+                  <div className="mt-2 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-white/50">Wallets buying this mint</div>
+                      <div className="text-sm font-semibold text-white">
+                        {smartForMint?.walletCount ?? 0}
+                      </div>
+                    </div>
+                    {smartLoading && (
+                      <div className="mt-2 text-xs text-white/50">Loading smart-wallet activity…</div>
+                    )}
+                    {!smartLoading && smartBuys.length === 0 && (
+                      <div className="mt-2 text-xs text-white/50">
+                        No smart-wallet buys detected in recent transactions.
+                      </div>
+                    )}
+                    {!smartLoading && smartBuys.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-white/70">
+                        {smartBuys.map((buy) => (
+                          <li key={`${buy.signature}-${buy.wallet}`} className="flex items-center justify-between">
+                            <span className="font-mono">{shortAddr(buy.wallet, 6, 6)}</span>
+                            <span className="text-white/50">{formatShort(buy.amount)}</span>
+                            <span className="text-white/40">{formatBlockTime(buy.blockTime)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="mt-2 text-[11px] text-white/40">
+                      Based on the last 5 transactions per wallet. Updated {smartWallets?.timestamp ? new Date(smartWallets.timestamp).toLocaleString() : '—'}.
+                    </div>
+                  </div>
+                </div>
 
                 <div className="mt-4">
                   <div className="text-sm text-white/60">Signals</div>
