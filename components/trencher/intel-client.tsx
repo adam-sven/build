@@ -13,6 +13,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import VoteModal from "@/components/trencher/vote-modal";
 import type { Interval, TokenResponse } from "@/lib/trencher/types";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 const intervals: Interval[] = ["5m", "1h", "24h", "7d"];
 
@@ -46,6 +55,19 @@ function gmgnInterval(interval: Interval): string {
   return "1D";
 }
 
+function normalizeTsSeconds(t: number): number {
+  if (!Number.isFinite(t)) return 0;
+  return t > 10_000_000_000 ? Math.floor(t / 1000) : Math.floor(t);
+}
+
+function backsolvePrice(current: number | null, changePct: number | null): number | null {
+  if (current === null || !Number.isFinite(current) || current <= 0) return null;
+  if (changePct === null || !Number.isFinite(changePct)) return current;
+  const factor = 1 + changePct / 100;
+  if (factor <= 0) return current;
+  return current / factor;
+}
+
 type TraderLink = { label: string; url: string };
 
 function buildTraderLinks(mint: string, pairUrl: string | null): TraderLink[] {
@@ -69,6 +91,8 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const [voteDirection, setVoteDirection] = useState<"up" | "down" | null>(null);
   const [showVoters, setShowVoters] = useState(false);
   const [recentVoters, setRecentVoters] = useState<string[]>([]);
+  const [chartSource, setChartSource] = useState<"native" | "gmgn">("native");
+  const [error, setError] = useState<string | null>(null);
   const sampleMints = [
     "So11111111111111111111111111111111111111112",
     "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
@@ -78,12 +102,16 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const load = async (targetMint: string, targetInterval: Interval) => {
     if (!targetMint) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}`);
       const json = await res.json();
       if (json?.ok) {
         setData(json);
         router.replace(`/intel?mint=${targetMint}`);
+      } else {
+        setData(null);
+        setError(json?.error?.message || "Failed to load token intel");
       }
       const votesRes = await fetch(`/api/ui/votes?chain=solana&mint=${targetMint}`);
       const votes = await votesRes.json();
@@ -116,6 +144,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
       </div>
 
       {loading && <div className="text-sm text-white/60">Loading...</div>}
+      {!loading && error && <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</div>}
 
       {!loading && !data && (
         <section className="rounded-xl border border-white/10 bg-black/30 p-5">
@@ -167,6 +196,34 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
         <>
           {(() => {
             const chartItems = Array.isArray(data.candles.items) ? data.candles.items : [];
+            const nativePoints = chartItems
+              .filter((c) => Number.isFinite(c.t) && Number.isFinite(c.c))
+              .map((c) => ({
+                t: normalizeTsSeconds(c.t),
+                label: new Date(normalizeTsSeconds(c.t) * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                close: Number(c.c),
+                open: Number(c.o),
+                high: Number(c.h),
+                low: Number(c.l),
+                volume: Number(c.v),
+              }));
+            const nowSec = Math.floor(Date.now() / 1000);
+            const inferredBase =
+              data.market.priceUsd ??
+              backsolvePrice(1, data.market.priceChange.h1) ??
+              backsolvePrice(1, data.market.priceChange.h24) ??
+              1;
+            const pNow = Number.isFinite(inferredBase) && inferredBase > 0 ? inferredBase : 1;
+            const p5m = backsolvePrice(pNow, data.market.priceChange.m5);
+            const p1h = backsolvePrice(pNow, data.market.priceChange.h1);
+            const p24h = backsolvePrice(pNow, data.market.priceChange.h24);
+            const syntheticPoints = [
+              { t: nowSec - 24 * 3600, label: "24h", close: p24h ?? pNow, open: p24h ?? pNow, high: p24h ?? pNow, low: p24h ?? pNow, volume: 0 },
+              { t: nowSec - 3600, label: "1h", close: p1h ?? pNow, open: p1h ?? pNow, high: p1h ?? pNow, low: p1h ?? pNow, volume: 0 },
+              { t: nowSec - 300, label: "5m", close: p5m ?? pNow, open: p5m ?? pNow, high: p5m ?? pNow, low: p5m ?? pNow, volume: 0 },
+              { t: nowSec, label: "now", close: pNow, open: pNow, high: pNow, low: pNow, volume: 0 },
+            ];
+            const chartSeries = nativePoints.length > 1 ? nativePoints : syntheticPoints;
             const gmgnSrc = `https://www.gmgn.cc/kline/sol/${data.mint}?interval=${encodeURIComponent(
               gmgnInterval(interval),
             )}&theme=dark`;
@@ -256,7 +313,27 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
 
           <section className="rounded-xl border border-white/10 bg-black/30 p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-semibold">Chart (GMGN)</h2>
+              <div className="space-y-2">
+                <h2 className="font-semibold">Chart</h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={chartSource === "native" ? "default" : "outline"}
+                    className={chartSource === "native" ? "bg-emerald-400 text-black hover:bg-emerald-300" : "border-white/20"}
+                    onClick={() => setChartSource("native")}
+                  >
+                    Native
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={chartSource === "gmgn" ? "default" : "outline"}
+                    className={chartSource === "gmgn" ? "bg-emerald-400 text-black hover:bg-emerald-300" : "border-white/20"}
+                    onClick={() => setChartSource("gmgn")}
+                  >
+                    GMGN
+                  </Button>
+                </div>
+              </div>
               <Tabs value={interval} onValueChange={(v) => setInterval(v as Interval)}>
                 <TabsList className="bg-white/5">
                   {intervals.map((i) => (
@@ -266,18 +343,79 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               </Tabs>
             </div>
             <div className="h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
-              <iframe
-                key={`${data.mint}:${interval}`}
-                src={gmgnSrc}
-                title="GMGN chart"
-                className="h-full w-full"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
+              {chartSource === "gmgn" && (
+                <iframe
+                  key={`${data.mint}:${interval}`}
+                  src={gmgnSrc}
+                  title="GMGN chart"
+                  className="h-full w-full"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              )}
+              {chartSource === "native" && chartSeries.length > 1 && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartSeries} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                    <defs>
+                      <linearGradient id="nativeChartFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="#34d399" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#16303a" strokeDasharray="4 4" />
+                    <XAxis dataKey="label" minTickGap={28} tick={{ fill: "#8fa3b4", fontSize: 11 }} />
+                    <YAxis
+                      tick={{ fill: "#8fa3b4", fontSize: 11 }}
+                      width={76}
+                      tickFormatter={(v) => Number(v).toFixed(6)}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#05070c",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        borderRadius: "8px",
+                        color: "#e5eef6",
+                      }}
+                      formatter={(value: number, name: string) => {
+                        if (name === "close") return [`$${Number(value).toFixed(8)}`, "Close"];
+                        if (name === "open") return [`$${Number(value).toFixed(8)}`, "Open"];
+                        if (name === "high") return [`$${Number(value).toFixed(8)}`, "High"];
+                        if (name === "low") return [`$${Number(value).toFixed(8)}`, "Low"];
+                        return [Number(value).toFixed(2), "Volume"];
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="close"
+                      stroke="#34d399"
+                      strokeWidth={2}
+                      fill="url(#nativeChartFill)"
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+              {chartSource === "native" && chartSeries.length <= 1 && (
+                <div className="grid h-full place-items-center px-6 text-center text-sm text-white/60">
+                  <div>
+                    Native chart data is limited for this token/interval right now.
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-white/20"
+                        onClick={() => setChartSource("gmgn")}
+                      >
+                        Switch to GMGN chart
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            {chartItems.length <= 1 && (
+            {chartSource === "native" && nativePoints.length <= 1 && (
               <div className="mt-2 text-xs text-white/50">
-                Native OHLC API has little/no data for this pair currently; GMGN embed is used as primary chart.
+                Native OHLC API has little/no data for this pair currently. A synthetic trend is shown from market change values.
               </div>
             )}
           </section>

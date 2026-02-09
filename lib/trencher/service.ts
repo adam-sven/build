@@ -60,12 +60,27 @@ export async function buildToken(chain: Chain, mint: string, interval: Interval 
   if (cached) return cached;
 
   const [marketData, holders, votes, search, peak, candles] = await Promise.all([
-    marketProvider.getTokenMarket(chain, mint),
+    marketProvider
+      .getTokenMarket(chain, mint)
+      .catch(() => ({
+        identity: { name: null, symbol: null, image: null },
+        market: {
+          priceUsd: null,
+          liquidityUsd: null,
+          volume24hUsd: null,
+          fdvUsd: null,
+          marketCapUsd: null,
+          priceChange: { m5: null, h1: null, h24: null },
+          txCount24h: null,
+          pairUrl: `https://dexscreener.com/solana/${mint}`,
+          dex: null,
+        },
+      })),
     getHolderStats(mint),
     getVotes24h(chain, mint),
     getSearchCounts(chain, mint),
     getTokenPeak(chain, mint),
-    marketProvider.getCandles(chain, mint, interval),
+    marketProvider.getCandles(chain, mint, interval).catch(() => []),
   ]);
 
   const signals = calcSignals({ market: marketData.market, top10Pct: holders.top10Pct });
@@ -135,6 +150,14 @@ export async function buildToken(chain: Chain, mint: string, interval: Interval 
 }
 
 function toRow(token: TokenResponse, final: number): TokenRowSummary {
+  const pairUrl = token.market.pairUrl || "";
+  const dex = (token.market.dex || "").toLowerCase();
+  const mintLower = token.mint.toLowerCase();
+  let source: "pumpfun" | "bagsapp" | "other" = "other";
+  if (mintLower.endsWith("pump")) source = "pumpfun";
+  else if (pairUrl.includes("pump.fun") || dex.includes("pump")) source = "pumpfun";
+  else if (pairUrl.includes("bags") || dex.includes("bags")) source = "bagsapp";
+
   return {
     chain: token.chain,
     mint: token.mint,
@@ -157,6 +180,7 @@ function toRow(token: TokenResponse, final: number): TokenRowSummary {
     },
     why: token.why,
     pairUrl: token.market.pairUrl,
+    source,
     peakRank: token.votes.peakRank,
     peakScore: token.votes.peakScore,
     finalScore: final,

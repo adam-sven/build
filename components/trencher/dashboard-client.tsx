@@ -1,0 +1,308 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { DiscoverResponse, TokenResponse } from "@/lib/trencher/types";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+type SmartWalletSnapshot = {
+  ok: boolean;
+  timestamp: string;
+  topWallets: Array<{
+    wallet: string;
+    buyCount: number;
+    sampledPnlSol: number;
+    uniqueMints: number;
+  }>;
+  topMints: Array<{
+    mint: string;
+    walletCount: number;
+    buyCount: number;
+    token: {
+      name: string | null;
+      symbol: string | null;
+      image: string | null;
+      change24h: number | null;
+      volume24h: number | null;
+      liquidityUsd: number | null;
+    };
+  }>;
+};
+
+type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
+const SOURCE_META: Record<Exclude<SourceFilter, "all">, { label: string; icon: string }> = {
+  pumpfun: { label: "Pumpfun", icon: "/source-pumpfun.svg" },
+  bagsapp: { label: "BagsApp", icon: "/source-bagsapp.svg" },
+  other: { label: "Solana", icon: "/source-solana.svg" },
+};
+
+function short(v: string, left = 6, right = 6) {
+  return `${v.slice(0, left)}...${v.slice(-right)}`;
+}
+
+function usd(v: number | null) {
+  if (v === null) return "-";
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}m`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`;
+  return `$${v.toFixed(2)}`;
+}
+
+function pct(v: number | null) {
+  if (v === null) return "-";
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+function normalizeTsSeconds(t: number): number {
+  if (!Number.isFinite(t)) return 0;
+  return t > 10_000_000_000 ? Math.floor(t / 1000) : Math.floor(t);
+}
+
+function SourceIcon({ source }: { source: "pumpfun" | "bagsapp" | "other" }) {
+  const meta = SOURCE_META[source];
+  return (
+    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-black/40">
+      <img src={meta.icon} alt={meta.label} className="h-4 w-4 object-contain" />
+    </span>
+  );
+}
+
+export default function DashboardClient() {
+  const [discover, setDiscover] = useState<DiscoverResponse | null>(null);
+  const [smart, setSmart] = useState<SmartWalletSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [mintInput, setMintInput] = useState("");
+  const [intel, setIntel] = useState<TokenResponse | null>(null);
+  const [intelLoading, setIntelLoading] = useState(false);
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    try {
+      const [discoverRes, smartRes] = await Promise.all([
+        fetch("/api/ui/discover?chain=solana&mode=trending"),
+        fetch("/api/smart-wallets"),
+      ]);
+      const [discoverJson, smartJson] = await Promise.all([discoverRes.json(), smartRes.json()]);
+      if (discoverJson?.ok) setDiscover(discoverJson);
+      if (smartJson?.ok) setSmart(smartJson);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadIntel = async (mint: string) => {
+    if (!mint) return;
+    setIntelLoading(true);
+    try {
+      const res = await fetch(`/api/ui/token?chain=solana&mint=${mint}&interval=1h`);
+      const json = await res.json();
+      if (json?.ok) setIntel(json);
+    } finally {
+      setIntelLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const topTokens = useMemo(() => (discover?.items || []).slice(0, 5), [discover]);
+  const topWallets = useMemo(() => (smart?.topWallets || []).slice(0, 5), [smart]);
+
+  const miniChart = useMemo(() => {
+    if (!intel) return [];
+    return (intel.candles.items || [])
+      .filter((c) => Number.isFinite(c.t) && Number.isFinite(c.c))
+      .map((c) => ({
+        t: normalizeTsSeconds(c.t),
+        label: new Date(normalizeTsSeconds(c.t) * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        close: Number(c.c),
+      }));
+  }, [intel]);
+
+  return (
+    <main className="mx-auto w-full max-w-7xl px-4 py-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-white/60">Market overview + smart wallets + quick Intel in one screen.</p>
+        </div>
+        <Button onClick={loadDashboard} variant="outline" className="border-white/20 text-white/80">
+          Refresh Data
+        </Button>
+      </div>
+
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Metric title="Trending tokens" value={String(discover?.items?.length || 0)} />
+        <Metric title="Smart wallets" value={String(smart?.topWallets?.length || 0)} />
+        <Metric title="Tracked mints" value={String(smart?.topMints?.length || 0)} />
+        <Metric title="Updated" value={smart?.timestamp ? new Date(smart.timestamp).toLocaleTimeString() : "-"} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <section className="xl:col-span-5 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Top 5 Tokens</h2>
+            <Link href="/discover" className="text-xs text-emerald-300 hover:text-emerald-200">Open Discover</Link>
+          </div>
+          <div className="space-y-2">
+            {topTokens.map((item, idx) => (
+              <Link
+                key={item.mint}
+                href={`/intel?mint=${item.mint}`}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-black/25 p-2 hover:border-emerald-300/30"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <TokenAvatar image={item.image} symbol={item.symbol} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium inline-flex items-center gap-1.5">
+                      <span>#{idx + 1} {item.name || "Unknown"}</span>
+                      <SourceIcon source={item.source} />
+                    </div>
+                    <div className="truncate text-xs text-white/55">{short(item.mint)}</div>
+                  </div>
+                </div>
+                <div className="text-right text-xs">
+                  <div className={item.priceChange.h24 && item.priceChange.h24 > 0 ? "text-emerald-300" : "text-red-300"}>
+                    {pct(item.priceChange.h24)}
+                  </div>
+                  <div className="text-white/55">Vol {usd(item.volume24hUsd)}</div>
+                </div>
+              </Link>
+            ))}
+            {!loading && topTokens.length === 0 && <p className="text-sm text-white/60">No token data yet.</p>}
+            {loading && <p className="text-sm text-white/60">Loading token rankings...</p>}
+          </div>
+        </section>
+
+        <section className="xl:col-span-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Top 5 Traders</h2>
+            <Link href="/smart" className="text-xs text-cyan-300 hover:text-cyan-200">Open Smart Wallets</Link>
+          </div>
+          <div className="space-y-2">
+            {topWallets.map((wallet, idx) => (
+              <Link
+                key={wallet.wallet}
+                href={`/wallet/${wallet.wallet}`}
+                className="flex items-center justify-between rounded-lg border border-white/10 bg-black/25 p-2 hover:border-cyan-300/30"
+              >
+                <div>
+                  <div className="text-sm font-medium">#{idx + 1} {short(wallet.wallet)}</div>
+                  <div className="text-xs text-white/55">Buys {wallet.buyCount} • Mints {wallet.uniqueMints}</div>
+                </div>
+                <div className={wallet.sampledPnlSol >= 0 ? "text-sm text-emerald-300" : "text-sm text-red-300"}>
+                  {wallet.sampledPnlSol > 0 ? "+" : ""}
+                  {wallet.sampledPnlSol.toFixed(2)} SOL
+                </div>
+              </Link>
+            ))}
+            {!loading && topWallets.length === 0 && <p className="text-sm text-white/60">No trader data yet.</p>}
+            {loading && <p className="text-sm text-white/60">Loading trader activity...</p>}
+          </div>
+        </section>
+
+        <section className="xl:col-span-3 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <h2 className="font-semibold">Quick Intel</h2>
+          <p className="mt-1 text-xs text-white/55">Paste mint to preview chart + key stats. Full details on Intel page.</p>
+
+          <div className="mt-3 flex gap-2">
+            <Input
+              value={mintInput}
+              onChange={(e) => setMintInput(e.target.value.trim())}
+              placeholder="Enter mint"
+              className="border-white/10 bg-black/40"
+            />
+            <Button
+              onClick={() => loadIntel(mintInput)}
+              className="bg-emerald-400 text-black hover:bg-emerald-300"
+              disabled={!mintInput || intelLoading}
+            >
+              {intelLoading ? "..." : "Load"}
+            </Button>
+          </div>
+
+          {intel && (
+            <div className="mt-3 space-y-3">
+              <div>
+                <div className="text-sm font-medium">{intel.identity.name || "Unknown"} {intel.identity.symbol ? `(${intel.identity.symbol})` : ""}</div>
+                <div className="text-xs text-white/55">{short(intel.mint)}</div>
+              </div>
+              <div className="h-32 rounded-lg border border-white/10 bg-black/25 p-2">
+                {miniChart.length > 1 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={miniChart} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+                      <CartesianGrid stroke="#122631" strokeDasharray="3 3" />
+                      <XAxis dataKey="label" hide />
+                      <YAxis hide domain={["auto", "auto"]} />
+                      <Tooltip
+                        contentStyle={{
+                          background: "#06080d",
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value: number) => [`$${Number(value).toFixed(8)}`, "Close"]}
+                      />
+                      <Line type="monotone" dataKey="close" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="grid h-full place-items-center text-xs text-white/55">No native chart data yet.</div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <MiniStat label="Price" value={usd(intel.market.priceUsd)} />
+                <MiniStat label="Liquidity" value={usd(intel.market.liquidityUsd)} />
+                <MiniStat label="Volume 24h" value={usd(intel.market.volume24hUsd)} />
+                <MiniStat label="Holders" value={intel.holders.holderCount === null ? "-" : String(intel.holders.holderCount)} />
+              </div>
+              <Link href={`/intel?mint=${intel.mint}`} className="block text-center text-xs text-emerald-300 hover:text-emerald-200">
+                Open full Intel page
+              </Link>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function Metric({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-white/50">{title}</div>
+      <div className="mt-1 text-lg font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
+  if (image) {
+    return <img src={image} alt={symbol || "token"} className="h-8 w-8 rounded-full border border-white/15 object-cover" />;
+  }
+  return (
+    <div className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px] font-semibold text-white/70">
+      {(symbol || "T").slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/25 p-2">
+      <div className="text-[10px] uppercase tracking-wide text-white/50">{label}</div>
+      <div className="mt-1 text-xs font-semibold">{value}</div>
+    </div>
+  );
+}

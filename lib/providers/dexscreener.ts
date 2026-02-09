@@ -73,8 +73,8 @@ export class DexscreenerMarketProvider {
 
   async getTokenMarket(chain: Chain, mint: string): Promise<{ identity: TokenIdentity; market: MarketSnapshot }> {
     const pair = await this.getPrimaryPair(chain, mint);
-    if (!pair) throw new Error("provider_error");
     const jupToken = await this.getJupToken(mint);
+    if (!pair && !jupToken) throw new Error("provider_error");
     const pairSocials = this.extractSocials(pair);
 
     return {
@@ -122,7 +122,8 @@ export class DexscreenerMarketProvider {
       if (!Array.isArray(list)) return [];
       return list
         .map((row: any) => ({
-          t: Number(row[0]) * 1000,
+          // Keep UNIX time in seconds (all app charts normalize from seconds).
+          t: Number(row[0]),
           o: Number(row[1]),
           h: Number(row[2]),
           l: Number(row[3]),

@@ -166,7 +166,13 @@ export default function SmartWalletsPage() {
   }, [data, walletFilter]);
 
   const topMints = useMemo(() => {
-    const list = data?.topMints || [];
+    const list = [...(data?.topMints || [])].sort((a, b) => {
+      const aKnown = (a.token?.name || a.token?.symbol || a.token?.image) ? 1 : 0;
+      const bKnown = (b.token?.name || b.token?.symbol || b.token?.image) ? 1 : 0;
+      if (bKnown !== aKnown) return bKnown - aKnown;
+      if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
+      return b.walletCount - a.walletCount;
+    });
     if (!mintFilter.trim()) return list;
     const q = mintFilter.toLowerCase();
     return list.filter((item) => {
@@ -256,7 +262,9 @@ export default function SmartWalletsPage() {
                       <div className="grid grid-cols-[28px_1fr_auto] gap-3 items-center">
                         <div className="text-xs text-white/40">#{index + 1}</div>
                         <div>
-                          <div className="font-mono text-sm">{shortAddr(wallet.wallet, 7, 7)}</div>
+                          <Link href={`/wallet/${wallet.wallet}`} className="font-mono text-sm text-cyan-200 hover:text-cyan-100">
+                            {shortAddr(wallet.wallet, 7, 7)}
+                          </Link>
                           <div className="mt-1 text-xs text-white/50">
                             Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
                           </div>
@@ -272,14 +280,12 @@ export default function SmartWalletsPage() {
                         <div className="rounded-xl border border-white/10 bg-black/25 p-3">
                           <div className="flex items-center justify-between">
                             <div className="text-xs uppercase tracking-widest text-white/45">Recent buys</div>
-                            <a
-                              href={`https://solscan.io/account/${wallet.wallet}`}
-                              target="_blank"
-                              rel="noreferrer"
+                            <Link
+                              href={`/wallet/${wallet.wallet}`}
                               className="text-xs text-cyan-300 hover:text-cyan-200"
                             >
-                              Open Solscan
-                            </a>
+                              Open Wallet Profile
+                            </Link>
                           </div>
                           <ul className="mt-2 space-y-1 text-xs text-white/70">
                             {details.buys.slice(0, 8).map((buy) => (
@@ -340,6 +346,17 @@ export default function SmartWalletsPage() {
                         <div className="text-xs text-white/40">#{index + 1}</div>
                         <div>
                           <div className="flex items-center gap-2">
+                            {token.token.image ? (
+                              <img
+                                src={token.token.image}
+                                alt={token.token.symbol || "token"}
+                                className="h-6 w-6 rounded-full border border-white/15 object-cover"
+                              />
+                            ) : (
+                              <div className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px]">
+                                {(token.token.symbol || "T").slice(0, 1)}
+                              </div>
+                            )}
                             <span className="font-semibold">
                               {token.token.symbol || shortAddr(token.mint, 4, 4)}
                             </span>
@@ -348,7 +365,7 @@ export default function SmartWalletsPage() {
                             </span>
                           </div>
                           <div className="mt-1 text-xs text-white/50">
-                            {token.walletCount} wallets • {token.buyCount} buys • Liq {formatUsd(token.token.liquidityUsd)}
+                            {token.walletCount} wallets • {token.buyCount} buys • Liq {formatUsd(token.token.liquidityUsd)} • Vol {formatUsd(token.token.volume24h)}
                           </div>
                         </div>
                         <div className={`text-sm font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
@@ -370,9 +387,13 @@ export default function SmartWalletsPage() {
                           <div className="mt-3 text-xs uppercase tracking-widest text-white/45">Wallets buying this token</div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {walletList.map((wallet) => (
-                              <span key={`${token.mint}-${wallet}`} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-mono text-white/75">
+                              <Link
+                                key={`${token.mint}-${wallet}`}
+                                href={`/wallet/${wallet}`}
+                                className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-mono text-white/75 hover:border-cyan-300/40 hover:text-white"
+                              >
                                 {shortAddr(wallet, 4, 4)}
-                              </span>
+                              </Link>
                             ))}
                           </div>
 

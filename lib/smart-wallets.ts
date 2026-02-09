@@ -81,6 +81,9 @@ const WSOL_MINT = "So11111111111111111111111111111111111111112";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const RPC_TIMEOUT_MS = 10_000;
 const RPC_RETRIES = 2;
+const JUP_TTL = 60 * 60 * 1000;
+let jupTokenMap: Map<string, any> | null = null;
+let jupFetchedAt = 0;
 
 const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
 const FILE_CACHE_PATH = path.join(os.tmpdir(), "smart-wallets-cache.json");
@@ -317,7 +320,7 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
     }
     const json = await res.json();
     const pair = pickBestPair(json);
-    return {
+    const fromDex = {
       name: pair?.baseToken?.name || null,
       symbol: pair?.baseToken?.symbol || null,
       image: pair?.info?.imageUrl || null,
@@ -328,19 +331,101 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
       pairUrl: pair?.url || null,
       dex: pair?.dexId || null,
     };
+    if (fromDex.name || fromDex.symbol || fromDex.image) return fromDex;
   } catch {
-    return {
-      name: null,
-      symbol: null,
-      image: null,
-      priceUsd: null,
-      change24h: null,
-      volume24h: null,
-      liquidityUsd: null,
-      pairUrl: null,
-      dex: null,
-    };
+    // continue to Jup fallback
   }
+
+  try {
+    const now = Date.now();
+    const stale = now - jupFetchedAt > JUP_TTL;
+    if (!jupTokenMap || stale) {
+      const res = await fetch("https://tokens.jup.ag/tokens?tags=verified", {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        const list = await res.json();
+        const next = new Map<string, any>();
+        if (Array.isArray(list)) {
+          for (const token of list) {
+            if (typeof token?.address === "string") next.set(token.address, token);
+          }
+        }
+        jupTokenMap = next;
+        jupFetchedAt = now;
+      }
+    }
+    const token = jupTokenMap?.get(mint) || null;
+    if (token) {
+      return {
+        name: token?.name || null,
+        symbol: token?.symbol || null,
+        image: token?.logoURI || null,
+        priceUsd: null,
+        change24h: null,
+        volume24h: null,
+        liquidityUsd: null,
+        pairUrl: null,
+        dex: null,
+      };
+    }
+  } catch {
+    // fallthrough
+  }
+
+  try {
+    const apiKey = process.env.HELIUS_API_KEY;
+    if (apiKey) {
+      const res = await fetch(`https://mainnet.helius-rpc.com/?api-key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "getAsset",
+          method: "getAsset",
+          params: { id: mint },
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const result = json?.result;
+        const image =
+          result?.content?.files?.find((f: any) => typeof f?.cdn_uri === "string")?.cdn_uri ||
+          result?.content?.files?.find((f: any) => typeof f?.uri === "string")?.uri ||
+          null;
+        const name = result?.content?.metadata?.name || result?.content?.metadata?.symbol || null;
+        const symbol = result?.content?.metadata?.symbol || null;
+        if (name || symbol || image) {
+          return {
+            name,
+            symbol,
+            image,
+            priceUsd: null,
+            change24h: null,
+            volume24h: null,
+            liquidityUsd: null,
+            pairUrl: null,
+            dex: null,
+          };
+        }
+      }
+    }
+  } catch {
+    // fallthrough
+  }
+
+  return {
+    name: null,
+    symbol: null,
+    image: null,
+    priceUsd: null,
+    change24h: null,
+    volume24h: null,
+    liquidityUsd: null,
+    pairUrl: null,
+    dex: null,
+  };
 }
 
 function readFileCache(): SmartWalletSnapshot | null {

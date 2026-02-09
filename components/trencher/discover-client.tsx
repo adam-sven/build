@@ -46,11 +46,26 @@ function pct(v: number | null) {
   return `${s}${v.toFixed(2)}%`;
 }
 
+type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
+
+const SOURCE_META: Record<SourceFilter, { label: string; icon: string }> = {
+  all: { label: "All", icon: "/source-all.svg" },
+  pumpfun: { label: "Pumpfun", icon: "/source-pumpfun.svg" },
+  bagsapp: { label: "BagsApp", icon: "/source-bagsapp.svg" },
+  other: { label: "Solana", icon: "/source-solana.svg" },
+};
+
+function SourceIcon({ source, className = "h-5 w-5" }: { source: SourceFilter; className?: string }) {
+  const meta = SOURCE_META[source];
+  return <img src={meta.icon} alt={meta.label} className={`${className} shrink-0 object-contain`} />;
+}
+
 export default function DiscoverClient() {
   const router = useRouter();
 
   const [mode, setMode] = useState<DiscoverMode>("trending");
   const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<TokenRowSummary[]>([]);
   const [voteTarget, setVoteTarget] = useState<{ mint: string; direction: "up" | "down" } | null>(null);
@@ -72,9 +87,12 @@ export default function DiscoverClient() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((i) => `${i.name || ""} ${i.symbol || ""} ${i.mint}`.toLowerCase().includes(q));
-  }, [items, query]);
+    return items.filter((i) => {
+      if (sourceFilter !== "all" && i.source !== sourceFilter) return false;
+      if (!q) return true;
+      return `${i.name || ""} ${i.symbol || ""} ${i.mint}`.toLowerCase().includes(q);
+    });
+  }, [items, query, sourceFilter]);
 
   const onSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +131,27 @@ export default function DiscoverClient() {
           </TabsList>
         </Tabs>
 
-        <form onSubmit={onSearchSubmit} className="flex w-full max-w-md gap-2">
+        <form onSubmit={onSearchSubmit} className="flex w-full max-w-2xl gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto rounded-md border border-white/10 bg-black/40 p-1">
+            {(Object.keys(SOURCE_META) as SourceFilter[]).map((src) => {
+              const active = sourceFilter === src;
+              return (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setSourceFilter(src)}
+                  className={`inline-flex min-w-max items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition ${
+                    active ? "bg-emerald-400 text-black" : "text-white/70 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-black/40">
+                    <SourceIcon source={src} className="h-4 w-4" />
+                  </span>
+                  <span>{SOURCE_META[src].label}</span>
+                </button>
+              );
+            })}
+          </div>
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -142,8 +180,11 @@ export default function DiscoverClient() {
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div>
-                  <Link href={`/intel?mint=${item.mint}`} className="font-semibold hover:text-emerald-300">
-                    {item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span>
+                  <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
+                    <span className="grid h-6 w-6 place-items-center rounded-md bg-black/40">
+                      <SourceIcon source={item.source as SourceFilter} className="h-5 w-5" />
+                    </span>
+                    <span>{item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span></span>
                   </Link>
                   <div className="text-xs text-white/45">{shortMint(item.mint)}</div>
                   {item.peakRank > 0 && <div className="mt-1 text-xs text-cyan-300">Peak #{item.peakRank}</div>}
@@ -190,8 +231,11 @@ export default function DiscoverClient() {
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div>
-                <Link href={`/intel?mint=${item.mint}`} className="font-semibold hover:text-emerald-300">
-                  {item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}
+                <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
+                  <span className="grid h-6 w-6 place-items-center rounded-md bg-black/40">
+                    <SourceIcon source={item.source as SourceFilter} className="h-5 w-5" />
+                  </span>
+                  <span>{item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}</span>
                 </Link>
                 <div className="text-xs text-white/45">{shortMint(item.mint)}</div>
                 </div>

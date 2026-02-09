@@ -124,6 +124,7 @@ export type TokenRowSummary = {
   flags: { bundles: RiskLevel; snipers: RiskLevel; botRisk: RiskLevel; confidence: number };
   why: string[];
   pairUrl: string | null;
+  source: "pumpfun" | "bagsapp" | "other";
   peakRank: number;
   peakScore: number;
   finalScore: number;
