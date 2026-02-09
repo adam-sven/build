@@ -89,11 +89,6 @@ export default function DashboardClient() {
   const loadDashboard = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      try {
-        await fetch("/api/live/tick?chain=solana&scope=all", { cache: "no-store" });
-      } catch {
-        // ignore
-      }
       const [discoverRes, smartRes] = await Promise.all([
         fetch("/api/ui/discover?chain=solana&mode=trending"),
         fetch("/api/smart-wallets"),

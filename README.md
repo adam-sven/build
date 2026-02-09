@@ -28,6 +28,9 @@ RPC_URL=
 KV_REST_API_URL=
 KV_REST_API_TOKEN=
 CRON_SECRET=
+LIVE_TICK_SECRET=
+REDIS_URL=
+REDIS_TLS=true
 API_KEYS=key1,key2
 INTERNAL_API_KEY=
 NEXT_PUBLIC_RPC_URL=
@@ -71,6 +74,30 @@ Cron endpoint (protected):
 `vercel.json` runs refresh every 2 minutes:
 
 - `*/2 * * * *` on `/api/cron/refresh`
+
+## Always-on Live Feed (no cron)
+
+For GMGN-style continuous updates, run an always-on worker that hits `/api/live/tick`:
+
+1. Set env on Vercel:
+- `LIVE_TICK_SECRET=<random-long-secret>`
+- `REDIS_URL=rediss://default:<password>@<host>:<port>`
+- `REDIS_TLS=true`
+
+2. Worker env (Railway/Fly/Render/VM):
+- `LIVE_APP_URL=https://your-domain.com`
+- `LIVE_TICK_SECRET=<same-secret-as-vercel>`
+- `LIVE_INTERVAL_MS=12000`
+- `LIVE_SCOPE=all`
+- `LIVE_CHAIN=solana`
+
+3. Start worker:
+
+```bash
+pnpm worker:live
+```
+
+The worker is lightweight and refreshes shared Redis cache behind a lock, so all users read the same hot data without per-user heavy RPC spikes.
 
 ## Pages
 

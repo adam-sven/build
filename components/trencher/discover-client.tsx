@@ -88,11 +88,6 @@ export default function DiscoverClient() {
   useEffect(() => {
     const timer = setInterval(async () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      try {
-        await fetch(`/api/live/tick?chain=solana&scope=discover`, { cache: "no-store" });
-      } catch {
-        // ignore
-      }
       await load(mode, true);
     }, 12_000);
 

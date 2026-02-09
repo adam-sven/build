@@ -6,7 +6,8 @@
     "dev": "NEXT_DISABLE_TURBOPACK=1 next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "worker:live": "node scripts/live-worker.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

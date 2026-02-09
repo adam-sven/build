@@ -13,5 +13,6 @@ export const SEARCH_TRENDING_THRESHOLD_1H = Number(
 
 export const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || "";
 export const CRON_SECRET = process.env.CRON_SECRET || "";
+export const LIVE_TICK_SECRET = process.env.LIVE_TICK_SECRET || "";
 
 export const DEFAULT_CHAIN = "solana" as const;

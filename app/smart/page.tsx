@@ -122,11 +122,6 @@ export default function SmartWalletsPage() {
     const load = async (force = false, silent = false) => {
       if (!silent) setLoading(true);
       try {
-        try {
-          await fetch(`/api/live/tick?chain=solana&scope=smart`, { cache: "no-store" });
-        } catch {
-          // ignore
-        }
         const res = await fetch(`/api/smart-wallets${force ? '?force=1' : ''}`);
         const json: SmartWalletSnapshot = await res.json();
         if (!ignore && json?.ok) {
