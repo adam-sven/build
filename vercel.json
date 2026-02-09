@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/smart-wallets/refresh",
-      "schedule": "*/5 * * * *"
+      "path": "/api/cron/refresh",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

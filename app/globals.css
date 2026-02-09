@@ -92,3 +92,33 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Wallet adapter theming: align with Trencher palette instead of default purple */
+.wallet-adapter-button,
+.wallet-adapter-button-trigger {
+  background: linear-gradient(180deg, #3be4c3 0%, #1fd6b0 100%) !important;
+  color: #04110e !important;
+  border: 1px solid rgba(28, 255, 205, 0.5) !important;
+  border-radius: 10px !important;
+  height: 36px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset !important;
+}
+
+.wallet-adapter-button:hover,
+.wallet-adapter-button-trigger:hover {
+  filter: brightness(1.03) !important;
+  opacity: 1 !important;
+}
+
+.wallet-adapter-dropdown-list {
+  background: #090d13 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.wallet-adapter-dropdown-list-item {
+  font-size: 12px !important;
+}

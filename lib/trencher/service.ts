@@ -1,0 +1,244 @@
+import { getHolderStats } from "@/lib/trencher/helius";
+import { marketProvider } from "@/lib/trencher/market";
+import { calcSignals, finalScore } from "@/lib/trencher/scoring";
+import {
+  cacheFeed,
+  cacheToken,
+  getCachedFeed,
+  getCachedToken,
+  getCandidateMints,
+  getSearchCounts,
+  getTokenPeak,
+  getVotes24h,
+  upsertToken,
+} from "@/lib/trencher/db";
+import { SEARCH_TRENDING_THRESHOLD_1H } from "@/lib/trencher/config";
+import type {
+  Chain,
+  DiscoverMode,
+  DiscoverResponse,
+  Interval,
+  TokenResponse,
+  TokenRowSummary,
+} from "@/lib/trencher/types";
+import { kvDel, kvSetNx } from "@/lib/trencher/kv";
+
+async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
+  if (chain !== "solana") return [];
+  const queries = ["sol", "pump", "meme", "ai", "new", "moon"];
+  const out = new Set<string>();
+
+  for (const q of queries) {
+    try {
+      const res = await fetch(
+        `https://api.dexscreener.com/latest/dex/search/?q=${encodeURIComponent(q)}`,
+        { headers: { Accept: "application/json" }, cache: "no-store" },
+      );
+      if (!res.ok) continue;
+      const json = await res.json();
+      const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
+      for (const p of pairs) {
+        if (p?.chainId !== "solana") continue;
+        const liq = Number(p?.liquidity?.usd || 0);
+        const vol = Number(p?.volume?.h24 || 0);
+        const mint = p?.baseToken?.address;
+        if (!mint) continue;
+        if (liq < 8_000 || vol < 20_000) continue;
+        out.add(String(mint));
+        if (out.size >= 180) return [...out];
+      }
+    } catch {
+      // continue
+    }
+  }
+
+  return [...out];
+}
+
+export async function buildToken(chain: Chain, mint: string, interval: Interval = "1h"): Promise<TokenResponse> {
+  const cached = await getCachedToken<TokenResponse>(chain, mint);
+  if (cached) return cached;
+
+  const [marketData, holders, votes, search, peak, candles] = await Promise.all([
+    marketProvider.getTokenMarket(chain, mint),
+    getHolderStats(mint),
+    getVotes24h(chain, mint),
+    getSearchCounts(chain, mint),
+    getTokenPeak(chain, mint),
+    marketProvider.getCandles(chain, mint, interval),
+  ]);
+
+  const signals = calcSignals({ market: marketData.market, top10Pct: holders.top10Pct });
+  const scores = finalScore({
+    up24h: votes.up24h,
+    down24h: votes.down24h,
+    market: marketData.market,
+    searches1h: search.searches1h,
+    searches24h: search.searches24h,
+    flags: {
+      bundles: signals.bundles,
+      snipers: signals.snipers,
+      botRisk: signals.botRisk,
+      confidence: signals.confidence,
+    },
+  });
+
+  const why: string[] = [];
+  if ((marketData.market.liquidityUsd || 0) > 50_000 && (marketData.market.volume24hUsd || 0) > 100_000) {
+    why.push("High liquidity with active volume.");
+  }
+  if (votes.up24h - votes.down24h > 0) why.push("Net positive votes in rolling 24h.");
+  if (search.searches1h >= SEARCH_TRENDING_THRESHOLD_1H) why.push("High search interest in last hour.");
+  if (why.length === 0) why.push("Baseline quality and activity signals only.");
+
+  const payload: TokenResponse = {
+    apiVersion: "v1",
+    ok: true,
+    chain,
+    mint,
+    identity: marketData.identity,
+    market: marketData.market,
+    candles: {
+      interval,
+      items: candles,
+    },
+    holders,
+    signals,
+    votes: {
+      up24h: votes.up24h,
+      down24h: votes.down24h,
+      score24h: votes.up24h - votes.down24h,
+      peakUpvotes24h: peak.peakUpvotes24h,
+      peakScore: peak.peakScore,
+      peakRank: peak.peakRank,
+    },
+    search: {
+      searches1h: search.searches1h,
+      searches24h: search.searches24h,
+      trending: search.searches1h >= SEARCH_TRENDING_THRESHOLD_1H,
+    },
+    why,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await upsertToken({
+    chain,
+    mint,
+    metadataJson: { name: payload.identity.name, symbol: payload.identity.symbol, image: payload.identity.image },
+    peakRank: peak.peakRank,
+    peakScore: Math.max(peak.peakScore, scores.score),
+    peakUpvotes24h: Math.max(peak.peakUpvotes24h, votes.up24h),
+  });
+
+  await cacheToken(chain, mint, payload, 45);
+  return payload;
+}
+
+function toRow(token: TokenResponse, final: number): TokenRowSummary {
+  return {
+    chain: token.chain,
+    mint: token.mint,
+    name: token.identity.name,
+    symbol: token.identity.symbol,
+    image: token.identity.image,
+    marketCapUsd: token.market.marketCapUsd,
+    fdvUsd: token.market.fdvUsd,
+    liquidityUsd: token.market.liquidityUsd,
+    volume24hUsd: token.market.volume24hUsd,
+    txCount24h: token.market.txCount24h,
+    priceChange: token.market.priceChange,
+    votes: { up24h: token.votes.up24h, down24h: token.votes.down24h, score24h: token.votes.score24h },
+    search: token.search,
+    flags: {
+      bundles: token.signals.bundles,
+      snipers: token.signals.snipers,
+      botRisk: token.signals.botRisk,
+      confidence: token.signals.confidence,
+    },
+    why: token.why,
+    pairUrl: token.market.pairUrl,
+    peakRank: token.votes.peakRank,
+    peakScore: token.votes.peakScore,
+    finalScore: final,
+  };
+}
+
+export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promise<DiscoverResponse> {
+  const cached = await getCachedFeed<DiscoverResponse>(chain, mode);
+  if (cached) return cached;
+
+  const lockKey = `trencher:lock:discover:${chain}:${mode}`;
+  const gotLock = await kvSetNx(lockKey, "1", 25);
+  if (!gotLock && cached) {
+    return cached;
+  }
+
+  try {
+    let candidates = await getCandidateMints(chain);
+    if (candidates.length < 20) {
+      const fallback = await fetchDexFallbackCandidates(chain);
+      candidates = Array.from(new Set([...candidates, ...fallback]));
+    }
+    const sampled = candidates.slice(0, 140);
+    const tokens = await Promise.all(
+      sampled.map(async (mint) => {
+        try {
+          return await buildToken(chain, mint, "1h");
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    const rows = tokens.filter(Boolean) as TokenResponse[];
+    const scored = rows.map((t) => {
+      const score = finalScore({
+        up24h: t.votes.up24h,
+        down24h: t.votes.down24h,
+        market: t.market,
+        searches1h: t.search.searches1h,
+        searches24h: t.search.searches24h,
+        flags: {
+          bundles: t.signals.bundles,
+          snipers: t.signals.snipers,
+          botRisk: t.signals.botRisk,
+          confidence: t.signals.confidence,
+        },
+      });
+      return { token: t, ...score };
+    });
+
+    let sorted = scored;
+    if (mode === "trending") sorted = [...scored].sort((a, b) => b.score - a.score);
+    if (mode === "voted") sorted = [...scored].sort((a, b) => b.voteScore - a.voteScore);
+    if (mode === "quality") sorted = [...scored].sort((a, b) => b.marketQuality - a.marketQuality);
+    if (mode === "new") sorted = [...scored].sort((a, b) => +new Date(b.token.updatedAt) - +new Date(a.token.updatedAt));
+
+    const items = sorted.slice(0, 100).map((x) => toRow(x.token, x.score));
+
+    for (let i = 0; i < items.length; i += 1) {
+      const row = items[i];
+      await upsertToken({
+        chain,
+        mint: row.mint,
+        peakRank: i + 1,
+        peakScore: row.finalScore,
+        peakUpvotes24h: row.votes.up24h,
+      });
+    }
+
+    const out: DiscoverResponse = {
+      apiVersion: "v1",
+      ok: true,
+      chain,
+      mode,
+      generatedAt: new Date().toISOString(),
+      items,
+    };
+
+    await cacheFeed(chain, mode, out, 120);
+    return out;
+  } finally {
+    await kvDel(lockKey);
+  }
+}

@@ -97,9 +97,15 @@ function isCompatibleSnapshot(snapshot: any): snapshot is SmartWalletSnapshot {
 export function loadWallets(): string[] {
   try {
     const raw = fs.readFileSync(WALLET_PATH, "utf-8");
-    const data = JSON.parse(raw);
-    const wallets = Array.isArray(data.wallets) ? data.wallets : [];
-    return Array.from(new Set(wallets.map((w) => String(w).trim()).filter(Boolean)));
+    const data = JSON.parse(raw) as { wallets?: unknown[] };
+    const wallets: unknown[] = Array.isArray(data.wallets) ? data.wallets : [];
+    return Array.from(
+      new Set(
+        wallets
+          .map((w: unknown) => String(w).trim())
+          .filter((w: string) => w.length > 0),
+      ),
+    );
   } catch {
     return [];
   }
@@ -230,7 +236,9 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
     const pre = (tx.meta.preTokenBalances || []).filter((b: any) => b.owner === wallet);
     const post = (tx.meta.postTokenBalances || []).filter((b: any) => b.owner === wallet);
 
-    const preMap = new Map(pre.map((b: any) => [b.mint, tokenUiAmount(b)]));
+    const preMap = new Map<string, number>(
+      pre.map((b: any) => [String(b.mint), tokenUiAmount(b)]),
+    );
     for (const p of post) {
       const mint = p.mint;
       if (!mint || mint === WSOL_MINT) continue;

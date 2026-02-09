@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <radialGradient id="g1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(128 128) rotate(90) scale(104 128)">
+      <stop stop-color="#02070B"/>
+      <stop offset="1" stop-color="#02070B" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+    <filter id="glow" x="42" y="66" width="172" height="124" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.23 0 0 0 0 0.95 0 0 0 0 0.86 0 0 0 0.65 0"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#blur)">
+    <ellipse cx="128" cy="128" rx="92" ry="72" fill="url(#g1)"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <path d="M64 92L119 98V158L66 152L64 92Z" fill="#70F5E7"/>
+    <path d="M192 92L137 98V158L190 152L192 92Z" fill="#70F5E7"/>
+  </g>
+
+  <path d="M64 92L119 98V158L66 152L64 92Z" fill="#84EEE9"/>
+  <path d="M192 92L137 98V158L190 152L192 92Z" fill="#84EEE9"/>
+</svg>

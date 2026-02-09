@@ -1,0 +1,5 @@
+export const TREASURY_PUBKEY =
+  process.env.NEXT_PUBLIC_TREASURY_PUBKEY || "CSJc1VcNJUHJHj199sVSa8XJ66rvEpf4sHbpeQj7N6vA";
+
+export const VOTE_FEE_LAMPORTS = Number(process.env.NEXT_PUBLIC_VOTE_FEE_LAMPORTS || "1000000");
+export const SUBMIT_FEE_LAMPORTS = Number(process.env.NEXT_PUBLIC_SUBMIT_FEE_LAMPORTS || "10000000");

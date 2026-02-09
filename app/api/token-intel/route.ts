@@ -63,6 +63,28 @@ type TokenIntelResponse = {
 
 const cache = new Map<string, { data: TokenIntelResponse; timestamp: number }>();
 const CACHE_TTL = 30_000;
+const RATE_LIMIT_WINDOW = 60_000;
+const RATE_LIMIT_MAX = 45;
+const rateLimitStore = new Map<string, { count: number; start: number }>();
+
+function getClientIp(request: NextRequest): string {
+	const fwd = request.headers.get("x-forwarded-for");
+	if (!fwd) return "anonymous";
+	const ip = fwd.split(",")[0]?.trim();
+	return ip || "anonymous";
+}
+
+function isRateAllowed(ip: string): boolean {
+	const now = Date.now();
+	const entry = rateLimitStore.get(ip);
+	if (!entry || now - entry.start > RATE_LIMIT_WINDOW) {
+		rateLimitStore.set(ip, { count: 1, start: now });
+		return true;
+	}
+	if (entry.count >= RATE_LIMIT_MAX) return false;
+	entry.count += 1;
+	return true;
+}
 
 function isValidSolanaAddress(addr: string): boolean {
 	if (!addr || typeof addr !== "string") return false;
@@ -590,6 +612,14 @@ async function fetchTokenIntel(mint: string): Promise<TokenIntelResponse> {
 }
 
 export async function GET(request: NextRequest) {
+	const ip = getClientIp(request);
+	if (!isRateAllowed(ip)) {
+		return NextResponse.json(
+			{ ok: false, error: "rate_limited" },
+			{ status: 429 },
+		);
+	}
+
 	try {
 		const mint = request.nextUrl.searchParams.get("mint");
 		if (!mint) {

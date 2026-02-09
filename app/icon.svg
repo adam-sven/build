@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(128 128) rotate(90) scale(104 128)">
+      <stop stop-color="#02070B"/>
+      <stop offset="1" stop-color="#02070B" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+  </defs>
+  <g filter="url(#blur)">
+    <ellipse cx="128" cy="128" rx="92" ry="72" fill="url(#bg)"/>
+  </g>
+  <path d="M64 92L119 98V158L66 152L64 92Z" fill="#84EEE9"/>
+  <path d="M192 92L137 98V158L190 152L192 92Z" fill="#84EEE9"/>
+</svg>
