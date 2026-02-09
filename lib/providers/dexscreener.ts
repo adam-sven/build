@@ -1,5 +1,7 @@
 import type { Candle, Chain, Interval, MarketSnapshot, TokenIdentity } from "@/lib/trencher/types";
 
+const FETCH_TIMEOUT_MS = 7_500;
+
 function parseNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   const n = Number(v);
@@ -23,10 +25,14 @@ export class DexscreenerMarketProvider {
     const stale = now - DexscreenerMarketProvider.jupFetchedAt > DexscreenerMarketProvider.JUP_TTL;
     if (!DexscreenerMarketProvider.jupTokenMap || stale) {
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         const res = await fetch("https://tokens.jup.ag/tokens?tags=verified", {
           cache: "no-store",
           headers: { Accept: "application/json" },
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
         if (res.ok) {
           const list = await res.json();
           const next = new Map<string, any>();
@@ -58,10 +64,15 @@ export class DexscreenerMarketProvider {
 
   async getPrimaryPair(chain: Chain, mint: string): Promise<any | null> {
     if (chain !== "solana") return null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
-    });
+      signal: controller.signal,
+    }).catch(() => null);
+    clearTimeout(timeout);
+    if (!res) return null;
     if (!res.ok) return null;
     const json = await res.json();
     const pairs = Array.isArray(json.pairs) ? json.pairs : [];
@@ -115,7 +126,14 @@ export class DexscreenerMarketProvider {
     const url = `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/${geckoCfg.timeframe}?aggregate=${geckoCfg.aggregate}&limit=${geckoCfg.limit}`;
 
     try {
-      const res = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
       if (!res.ok) return [];
       const json = await res.json();
       const list = json?.data?.attributes?.ohlcv_list;

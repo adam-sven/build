@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!allowed.has(mode)) return err("provider_error", "Invalid mode", 400);
 
   try {
-    await runLiveRefresh(chain, "discover");
+    void runLiveRefresh(chain, "discover");
     const feed = await buildDiscoverFeed(chain, mode);
     return ok(feed);
   } catch {

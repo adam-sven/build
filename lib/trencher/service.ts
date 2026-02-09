@@ -13,6 +13,11 @@ import {
   upsertToken,
 } from "@/lib/trencher/db";
 import { SEARCH_TRENDING_THRESHOLD_1H } from "@/lib/trencher/config";
+import {
+  DISCOVER_MIN_LIQUIDITY_USD,
+  DISCOVER_MIN_TX_24H,
+  DISCOVER_MIN_VOLUME_24H_USD,
+} from "@/lib/trencher/config";
 import type {
   Chain,
   DiscoverMode,
@@ -25,7 +30,7 @@ import { kvDel, kvSetNx } from "@/lib/trencher/kv";
 
 async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
   if (chain !== "solana") return [];
-  const queries = ["sol", "pump", "meme", "ai", "new", "moon"];
+  const queries = ["sol", "pump", "pumpswap", "pumpfun", "meme", "ai", "new", "moon"];
   const out = new Set<string>();
 
   for (const q of queries) {
@@ -41,9 +46,14 @@ async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
         if (p?.chainId !== "solana") continue;
         const liq = Number(p?.liquidity?.usd || 0);
         const vol = Number(p?.volume?.h24 || 0);
+        const tx24 =
+          Number(p?.txns?.h24?.buys || 0) +
+          Number(p?.txns?.h24?.sells || 0);
+        const h24 = Number(p?.priceChange?.h24 || 0);
         const mint = p?.baseToken?.address;
         if (!mint) continue;
-        if (liq < 8_000 || vol < 20_000) continue;
+        if (liq < 10_000 || vol < 30_000 || tx24 < 60) continue;
+        if (Number.isFinite(h24) && h24 <= -96) continue;
         out.add(String(mint));
         if (out.size >= 180) return [...out];
       }
@@ -187,14 +197,48 @@ function toRow(token: TokenResponse, final: number): TokenRowSummary {
   };
 }
 
+function isDiscoverEligible(token: TokenResponse, mode: DiscoverMode): boolean {
+  const liq = token.market.liquidityUsd ?? 0;
+  const vol = token.market.volume24hUsd ?? 0;
+  const tx = token.market.txCount24h ?? 0;
+  const h24 = token.market.priceChange.h24;
+  const mcap = token.market.marketCapUsd ?? 0;
+  const fdv = token.market.fdvUsd ?? 0;
+  const hasIdentity = Boolean(token.identity.name || token.identity.symbol || token.identity.image);
+
+  if (h24 !== null && Number.isFinite(h24) && h24 <= -96) return false;
+  if (!hasIdentity && liq < DISCOVER_MIN_LIQUIDITY_USD * 1.5) return false;
+  if (mode === "new") {
+    return liq >= Math.max(8_000, DISCOVER_MIN_LIQUIDITY_USD * 0.65) &&
+      vol >= Math.max(20_000, DISCOVER_MIN_VOLUME_24H_USD * 0.5);
+  }
+  if (mode === "voted") {
+    return liq >= Math.max(10_000, DISCOVER_MIN_LIQUIDITY_USD * 0.8);
+  }
+  if (mode === "quality") {
+    return (
+      liq >= DISCOVER_MIN_LIQUIDITY_USD * 1.6 &&
+      vol >= DISCOVER_MIN_VOLUME_24H_USD * 1.2 &&
+      tx >= DISCOVER_MIN_TX_24H * 1.25 &&
+      (mcap > 0 || fdv > 0)
+    );
+  }
+  return (
+    liq >= DISCOVER_MIN_LIQUIDITY_USD &&
+    vol >= DISCOVER_MIN_VOLUME_24H_USD &&
+    tx >= DISCOVER_MIN_TX_24H
+  );
+}
+
 export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promise<DiscoverResponse> {
   const cached = await getCachedFeed<DiscoverResponse>(chain, mode);
   if (cached) return cached;
+  const staleCached = await getCachedFeed<DiscoverResponse>(chain, mode, { allowStale: true });
 
   const lockKey = `trencher:lock:discover:${chain}:${mode}`;
   const gotLock = await kvSetNx(lockKey, "1", 25);
-  if (!gotLock && cached) {
-    return cached;
+  if (!gotLock && staleCached) {
+    return staleCached;
   }
 
   try {
@@ -238,7 +282,14 @@ export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promi
     if (mode === "quality") sorted = [...scored].sort((a, b) => b.marketQuality - a.marketQuality);
     if (mode === "new") sorted = [...scored].sort((a, b) => +new Date(b.token.updatedAt) - +new Date(a.token.updatedAt));
 
-    const items = sorted.slice(0, 100).map((x) => toRow(x.token, x.score));
+    const tokenByMint = new Map(sorted.map((x) => [x.token.mint, x.token] as const));
+    const items = sorted
+      .map((x) => toRow(x.token, x.score))
+      .filter((row) => {
+        const token = tokenByMint.get(row.mint);
+        return token ? isDiscoverEligible(token, mode) : false;
+      })
+      .slice(0, 100);
 
     for (let i = 0; i < items.length; i += 1) {
       const row = items[i];
@@ -262,6 +313,9 @@ export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promi
 
     await cacheFeed(chain, mode, out, 120);
     return out;
+  } catch (error) {
+    if (staleCached) return staleCached;
+    throw error;
   } finally {
     await kvDel(lockKey);
   }

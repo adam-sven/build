@@ -5,23 +5,40 @@ import type { Chain, DiscoverMode } from "@/lib/trencher/types";
 
 type LiveScope = "discover" | "smart" | "all";
 
-const DISCOVER_REFRESH_MS = 15_000;
+const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
+  trending: 12_000,
+  voted: 25_000,
+  new: 45_000,
+  quality: 60_000,
+};
 const SMART_REFRESH_MS = 45_000;
 const LIVE_LOCK_KEY = "trencher:live:refresh:lock";
 
-const DISCOVER_AT_KEY = (chain: Chain) => `trencher:live:discover:at:${chain}`;
+const DISCOVER_AT_KEY = (chain: Chain, mode: DiscoverMode) => `trencher:live:discover:at:${chain}:${mode}`;
 const SMART_AT_KEY = "trencher:live:smart:at";
 
 export async function runLiveRefresh(chain: Chain, scope: LiveScope = "all") {
   const now = Date.now();
-  const [discoverAt, smartAt] = await Promise.all([
-    kvGet<number>(DISCOVER_AT_KEY(chain)),
+  const modes: DiscoverMode[] = ["trending", "new", "voted", "quality"];
+  const [modeAts, smartAt] = await Promise.all([
+    Promise.all(modes.map((mode) => kvGet<number>(DISCOVER_AT_KEY(chain, mode)))),
     kvGet<number>(SMART_AT_KEY),
   ]);
+  const discoverAtMap = Object.fromEntries(modes.map((mode, i) => [mode, modeAts[i] || 0])) as Record<
+    DiscoverMode,
+    number
+  >;
+  const discoverAts = Object.values(discoverAtMap);
+  const discoverAt = discoverAts.length ? Math.min(...discoverAts.filter(Boolean)) || 0 : 0;
 
-  const needDiscover =
-    (scope === "all" || scope === "discover") &&
-    (!discoverAt || now - discoverAt > DISCOVER_REFRESH_MS);
+  const discoverModesToRefresh =
+    scope === "all" || scope === "discover"
+      ? modes.filter((mode) => {
+          const ts = discoverAtMap[mode];
+          return !ts || now - ts > DISCOVER_REFRESH_MS[mode];
+        })
+      : [];
+  const needDiscover = discoverModesToRefresh.length > 0;
   const needSmart = (scope === "all" || scope === "smart") && (!smartAt || now - smartAt > SMART_REFRESH_MS);
 
   if (!needDiscover && !needSmart) {
@@ -35,9 +52,12 @@ export async function runLiveRefresh(chain: Chain, scope: LiveScope = "all") {
 
   try {
     if (needDiscover) {
-      const modes: DiscoverMode[] = ["trending", "new", "voted", "quality"];
-      await Promise.all(modes.map((mode) => buildDiscoverFeed(chain, mode)));
-      await kvSet(DISCOVER_AT_KEY(chain), Date.now(), 3600);
+      await Promise.all(
+        discoverModesToRefresh.map(async (mode) => {
+          await buildDiscoverFeed(chain, mode);
+          await kvSet(DISCOVER_AT_KEY(chain, mode), Date.now(), 3600);
+        }),
+      );
     }
 
     if (needSmart) {
@@ -50,4 +70,3 @@ export async function runLiveRefresh(chain: Chain, scope: LiveScope = "all") {
     await kvDel(LIVE_LOCK_KEY);
   }
 }
-

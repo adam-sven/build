@@ -301,6 +301,127 @@ export default function Page() {
           ]
         }
       ]
+    },
+    {
+      id: 5,
+      title: 'Experiment #5 — Always-on live cache loop (v1.2)',
+      date: '2026-02-09',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Added Redis-first cache/lock support through `REDIS_URL` so shared state is no longer limited to in-memory fallback.',
+            'Shipped a protected live refresh endpoint (`/api/live/tick`) plus a Redis lock coordinator to prevent refresh stampedes.',
+            'Shipped an always-on worker (`pnpm worker:live`) and deployed it on Railway to keep data hot without user-triggered refreshes.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'Page freshness depended too much on user traffic. This experiment tests whether a continuous background updater can make the app feel live while keeping RPC usage controlled and predictable.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Worker calls `/api/live/tick?chain=solana&scope=all` on a fixed interval (`LIVE_INTERVAL_MS`).',
+            'Live tick acquires a Redis NX lock and refreshes discover/smart caches only when stale.',
+            'When cache is still fresh, tick returns quickly with `reason=fresh` and skips expensive provider calls.',
+            'When another process holds the lock, tick returns `reason=locked` and avoids duplicate refresh work.',
+            'UI routes (`/api/ui/discover`, `/api/smart-wallets`) read shared cached snapshots so all users consume the same warm data.',
+            'Security: live tick can require `LIVE_TICK_SECRET` via bearer auth for non-public background workers.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not full websocket market streaming.',
+            'Not direct DEX-level tick ingestion.',
+            'Not a replacement for a dedicated indexer pipeline.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'First refresh cycle can still be slow if upstream providers are slow or cold.',
+            'Metadata completeness depends on provider coverage (Dex/Jupiter/Helius availability per mint).',
+            'Current system is near-real-time polling, not sub-second push updates.',
+            'Secrets were rotated after setup due to manual testing exposure.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Split refresh cadence by cost: refresh `trending` more frequently and defer heavier modes (`new/voted/quality`) to slower intervals to reduce latency spikes.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/api/live/tick',
+            '/discover',
+            '/smart',
+            '/dashboard',
+            'scripts/live-worker.mjs'
+          ]
+        }
+      ]
+    },
+    {
+      id: 6,
+      title: 'Experiment #6 — Feed latency + quality gates (v1.3)',
+      date: '2026-02-09',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Split live refresh cadence by cost: `trending` refreshes fastest, while `new/voted/quality` refresh on slower intervals.',
+            'Added stale feed fallback so Discover can return previous good data when a refresh lock is held or upstream providers are slow.',
+            'Added stricter Discover eligibility gates (liq/vol/tx/h24 collapse checks) to reduce rugged/dead pairs in ranked output.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'The page felt slow during cold refreshes and surfaced too many low-quality pairs. This update focuses on perceived speed and better default feed quality.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Live refresh now tracks per-mode timestamps instead of refreshing all modes on every tick.',
+            'Discover cache writes both fresh and stale snapshots; readers prefer fresh but fall back to stale if needed.',
+            'Fallback candidate seeding now includes PumpSwap/Pump.fun-oriented queries and enforces minimum liq/vol/tx checks.',
+            'Discover ranking now applies mode-specific eligibility filters before final list output.',
+            'Dex/Jupiter metadata and chart fetches use tighter timeouts to prevent long blocking waits.',
+            'Smart-wallet token metadata fetch now uses batched concurrency + local cache to reduce missing name/icon rows from provider throttling.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not perfect rug detection.',
+            'Not full tick-by-tick websocket indexing.',
+            'Not guaranteed metadata coverage for every token mint.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'If a mint has no reliable pool/metadata source, it may still show as unknown in wallet-heavy views.',
+            'Native chart quality still depends on third-party OHLC coverage per pool/interval.',
+            'Quality gates are heuristic and will need periodic tuning as market conditions change.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Add a dedicated pool-resolution layer (mint -> best pool map) persisted in Redis/Postgres so chart and metadata lookups are consistent across pages.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/discover',
+            '/dashboard',
+            '/smart',
+            '/api/ui/discover',
+            '/api/live/tick'
+          ]
+        }
+      ]
     }
   ];
 

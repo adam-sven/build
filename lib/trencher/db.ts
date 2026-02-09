@@ -463,11 +463,23 @@ export async function getTokenPeak(chain: Chain, mint: string): Promise<{ peakRa
 }
 
 export async function cacheFeed(chain: Chain, mode: string, feed: any, ttlSeconds = 120) {
-  await kvSet(`trencher:feed:${chain}:${mode}`, feed, ttlSeconds);
+  await Promise.all([
+    kvSet(`trencher:feed:${chain}:${mode}`, feed, ttlSeconds),
+    kvSet(`trencher:feed:stale:${chain}:${mode}`, feed, Math.max(600, ttlSeconds * 5)),
+  ]);
 }
 
-export async function getCachedFeed<T>(chain: Chain, mode: string): Promise<T | null> {
-  return kvGet<T>(`trencher:feed:${chain}:${mode}`);
+export async function getCachedFeed<T>(
+  chain: Chain,
+  mode: string,
+  options?: { allowStale?: boolean },
+): Promise<T | null> {
+  const fresh = await kvGet<T>(`trencher:feed:${chain}:${mode}`);
+  if (fresh) return fresh;
+  if (options?.allowStale) {
+    return kvGet<T>(`trencher:feed:stale:${chain}:${mode}`);
+  }
+  return null;
 }
 
 export async function cacheToken(chain: Chain, mint: string, payload: any, ttlSeconds = 45) {

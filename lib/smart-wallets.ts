@@ -77,6 +77,8 @@ const SIGNATURES_LIMIT = 14;
 const MAX_TX_PER_WALLET = 12;
 const CONCURRENCY = 5;
 const TOKEN_METADATA_LIMIT = 80;
+const TOKEN_METADATA_CONCURRENCY = 8;
+const TOKEN_META_TTL = 10 * 60 * 1000;
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const RPC_TIMEOUT_MS = 10_000;
@@ -84,6 +86,7 @@ const RPC_RETRIES = 2;
 const JUP_TTL = 60 * 60 * 1000;
 let jupTokenMap: Map<string, any> | null = null;
 let jupFetchedAt = 0;
+const tokenMetaCache = new Map<string, { at: number; value: TopMint["token"] }>();
 
 const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
 const FILE_CACHE_PATH = path.join(os.tmpdir(), "smart-wallets-cache.json");
@@ -313,6 +316,11 @@ function pickBestPair(payload: any): any {
 }
 
 async function getMintMeta(mint: string): Promise<TopMint["token"]> {
+  const cached = tokenMetaCache.get(mint);
+  if (cached && Date.now() - cached.at < TOKEN_META_TTL) {
+    return cached.value;
+  }
+
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, { cache: "no-store" });
     if (!res.ok) {
@@ -331,7 +339,10 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
       pairUrl: pair?.url || null,
       dex: pair?.dexId || null,
     };
-    if (fromDex.name || fromDex.symbol || fromDex.image) return fromDex;
+    if (fromDex.name || fromDex.symbol || fromDex.image) {
+      tokenMetaCache.set(mint, { at: Date.now(), value: fromDex });
+      return fromDex;
+    }
   } catch {
     // continue to Jup fallback
   }
@@ -358,7 +369,7 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
     }
     const token = jupTokenMap?.get(mint) || null;
     if (token) {
-      return {
+      const result = {
         name: token?.name || null,
         symbol: token?.symbol || null,
         image: token?.logoURI || null,
@@ -369,6 +380,8 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
         pairUrl: null,
         dex: null,
       };
+      tokenMetaCache.set(mint, { at: Date.now(), value: result });
+      return result;
     }
   } catch {
     // fallthrough
@@ -397,7 +410,7 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
         const name = result?.content?.metadata?.name || result?.content?.metadata?.symbol || null;
         const symbol = result?.content?.metadata?.symbol || null;
         if (name || symbol || image) {
-          return {
+          const result = {
             name,
             symbol,
             image,
@@ -408,6 +421,8 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
             pairUrl: null,
             dex: null,
           };
+          tokenMetaCache.set(mint, { at: Date.now(), value: result });
+          return result;
         }
       }
     }
@@ -415,7 +430,7 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
     // fallthrough
   }
 
-  return {
+  const result = {
     name: null,
     symbol: null,
     image: null,
@@ -426,6 +441,22 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
     pairUrl: null,
     dex: null,
   };
+  tokenMetaCache.set(mint, { at: Date.now(), value: result });
+  return result;
+}
+
+async function mapMintMetaWithConcurrency(mints: string[]): Promise<Map<string, TopMint["token"]>> {
+  const out = new Map<string, TopMint["token"]>();
+  for (let i = 0; i < mints.length; i += TOKEN_METADATA_CONCURRENCY) {
+    const batch = mints.slice(i, i + TOKEN_METADATA_CONCURRENCY);
+    const chunk = await Promise.all(
+      batch.map(async (mint) => [mint, await getMintMeta(mint)] as const),
+    );
+    for (const [mint, meta] of chunk) {
+      out.set(mint, meta);
+    }
+  }
+  return out;
 }
 
 function readFileCache(): SmartWalletSnapshot | null {
@@ -501,10 +532,9 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       return b.buyCount - a.buyCount;
     });
 
-  const mintMetaEntries = await Promise.all(
-    rankedMints.slice(0, TOKEN_METADATA_LIMIT).map(async (item) => [item.mint, await getMintMeta(item.mint)] as const),
+  const mintMetaMap = await mapMintMetaWithConcurrency(
+    rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => item.mint),
   );
-  const mintMetaMap = new Map(mintMetaEntries);
 
   const topMints: TopMint[] = rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => ({
     mint: item.mint,
