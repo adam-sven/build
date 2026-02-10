@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { DiscoverMode, DiscoverResponse, TokenRowSummary } from "@/lib/trencher/types";
 import VoteModal from "@/components/trencher/vote-modal";
 
@@ -141,26 +142,21 @@ export default function DiscoverClient() {
         </Tabs>
 
         <form onSubmit={onSearchSubmit} className="flex w-full max-w-2xl gap-2">
-          <div className="flex items-center gap-1 overflow-x-auto rounded-md border border-white/10 bg-black/40 p-1">
-            {(Object.keys(SOURCE_META) as SourceFilter[]).map((src) => {
-              const active = sourceFilter === src;
-              return (
-                <button
-                  key={src}
-                  type="button"
-                  onClick={() => setSourceFilter(src)}
-                  className={`inline-flex min-w-max items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition ${
-                    active ? "bg-emerald-400 text-black" : "text-white/70 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <span className="grid h-5 w-5 place-items-center rounded-md bg-black/40">
-                    <SourceIcon source={src} className="h-4 w-4" />
+          <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
+            <SelectTrigger className="w-[150px] border-white/10 bg-black/40 text-white">
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent className="border-white/10 bg-black/95 text-white">
+              {(Object.keys(SOURCE_META) as SourceFilter[]).map((src) => (
+                <SelectItem key={src} value={src} className="focus:bg-white/10">
+                  <span className="inline-flex items-center gap-2">
+                    <SourceIcon source={src} className="h-5 w-5" />
+                    {SOURCE_META[src].label}
                   </span>
-                  <span>{SOURCE_META[src].label}</span>
-                </button>
-              );
-            })}
-          </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -190,8 +186,8 @@ export default function DiscoverClient() {
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div>
                   <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
-                    <span className="grid h-6 w-6 place-items-center rounded-md bg-black/40">
-                      <SourceIcon source={item.source as SourceFilter} className="h-5 w-5" />
+                    <span className="grid h-7 w-7 place-items-center rounded-md bg-black/40">
+                      <SourceIcon source={item.source as SourceFilter} className="h-6 w-6" />
                     </span>
                     <span>{item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span></span>
                   </Link>
@@ -241,8 +237,8 @@ export default function DiscoverClient() {
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div>
                 <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
-                  <span className="grid h-6 w-6 place-items-center rounded-md bg-black/40">
-                    <SourceIcon source={item.source as SourceFilter} className="h-5 w-5" />
+                  <span className="grid h-7 w-7 place-items-center rounded-md bg-black/40">
+                    <SourceIcon source={item.source as SourceFilter} className="h-6 w-6" />
                   </span>
                   <span>{item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}</span>
                 </Link>

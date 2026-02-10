@@ -13,7 +13,7 @@ export default function Page() {
   const [hasAccess, setHasAccess] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [openEntryId, setOpenEntryId] = useState<number | null>(4);
+  const [openEntryId, setOpenEntryId] = useState<number | null>(8);
 
   // Check token access in one place for easy future SPL token balance check
   const checkAccess = async (wallet: string): Promise<boolean> => {
@@ -47,6 +47,66 @@ export default function Page() {
   };
 
   const entries = [
+    {
+      id: 8,
+      title: 'Experiment #8 — Live Pipeline Hardening + Feed Quality Gates (v1.5)',
+      date: '2026-02-09',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Moved live refresh into an always-on worker path with lock-protected `/api/live/tick` calls.',
+            'Connected Redis-backed shared cache/lock flow so all users read warm snapshots instead of forcing per-user refresh spikes.',
+            'Tightened Discover quality defaults and reduced fallback candidate breadth to cut obvious rugs/dead pairs from default feed.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'The app felt slow during cold loads and RPC usage was too bursty. This update tests a push/warm-cache model: one background refresh loop, many cheap readers.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Background worker calls `/api/live/tick?chain=solana&scope=all` on interval with `LIVE_TICK_SECRET` auth.',
+            'Live tick uses Redis NX lock to prevent duplicate expensive refreshes (`reason=fresh/locked/updated`).',
+            'Discover refreshes are mode-specific by staleness window (`trending` fastest, heavier modes slower).',
+            'Smart-wallet refresh cadence default moved to 2-hour windows to reduce repeated sampled-PnL recalculation.',
+            'Webhook ingest path now validates mints before persisting to avoid junk token rows in wallet-derived views.',
+            'Intel native chart fallback now uses proper time-based x-axis points instead of mixed categorical labels.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not a full-chain indexer.',
+            'Not true tick-level websocket streaming.',
+            'Not complete metadata coverage for every mint in all market states.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'If upstream providers return sparse OHLC, native chart still falls back to synthetic trend points.',
+            'Wallet-token enrichment is still best-effort and can lag if third-party metadata endpoints throttle.',
+            'Webhook quality depends on selecting the right transaction scope and watched addresses.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Switch Discover candidate generation from broad scans to webhook/event deltas plus a small quality-qualified backfill set.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/api/live/tick',
+            '/api/ingest/helius',
+            '/discover',
+            '/smart',
+            'scripts/live-worker.mjs'
+          ]
+        }
+      ]
+    },
     {
       id: 1,
       title: 'Experiment #1 — Token-gated access as alignment',

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "worker:live": "node scripts/live-worker.mjs"
+    "worker:live": "node scripts/live-worker.mjs",
+    "helius:sync-wallets": "node scripts/helius-sync-webhook.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

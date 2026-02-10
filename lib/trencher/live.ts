@@ -12,7 +12,7 @@ const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
   new: 45_000,
   quality: 60_000,
 };
-const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || "300000");
+const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || "7200000");
 const LIVE_LOCK_KEY = "trencher:live:refresh:lock";
 
 const DISCOVER_AT_KEY = (chain: Chain, mode: DiscoverMode) => `trencher:live:discover:at:${chain}:${mode}`;

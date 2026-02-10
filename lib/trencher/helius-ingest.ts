@@ -76,6 +76,7 @@ const DEFAULT_TTL_SECONDS = Number(process.env.SMART_EVENT_TTL_SEC || `${24 * 36
 const MAX_EVENTS = Number(process.env.SMART_EVENT_MAX || "12000");
 const SNAPSHOT_TTL_SECONDS = Number(process.env.SMART_EVENT_SNAPSHOT_TTL_SEC || "1200");
 const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
+const SOL_MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,50}$/;
 
 let jupTokenMap: Map<string, any> | null = null;
 let jupFetchedAt = 0;
@@ -225,6 +226,7 @@ export function parseHeliusWebhookEvents(payload: any): LiveWalletEvent[] {
       const toWallet = String(tr?.toUserAccount || tr?.toTokenAccount || tr?.to || "");
       const amount = Number(tr?.tokenAmount || tr?.amount || 0);
       if (!signature || !mint || !toWallet) continue;
+      if (!SOL_MINT_RE.test(mint)) continue;
       if (!watched.has(toWallet)) continue;
       if (!(amount > 0)) continue;
       out.push({
@@ -271,6 +273,7 @@ export async function buildSmartSnapshotFromEvents(): Promise<SmartSnapshotLike 
   const byMint = new Map<string, LiveWalletEvent[]>();
 
   for (const event of events) {
+    if (!SOL_MINT_RE.test(event.mint)) continue;
     if (!watchedWallets.has(event.wallet)) continue;
     const walletList = byWallet.get(event.wallet) || [];
     walletList.push(event);

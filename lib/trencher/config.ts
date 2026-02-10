@@ -17,6 +17,6 @@ export const LIVE_TICK_SECRET = process.env.LIVE_TICK_SECRET || "";
 
 export const DEFAULT_CHAIN = "solana" as const;
 
-export const DISCOVER_MIN_LIQUIDITY_USD = Number(process.env.DISCOVER_MIN_LIQUIDITY_USD || "12000");
-export const DISCOVER_MIN_VOLUME_24H_USD = Number(process.env.DISCOVER_MIN_VOLUME_24H_USD || "40000");
-export const DISCOVER_MIN_TX_24H = Number(process.env.DISCOVER_MIN_TX_24H || "80");
+export const DISCOVER_MIN_LIQUIDITY_USD = Number(process.env.DISCOVER_MIN_LIQUIDITY_USD || "25000");
+export const DISCOVER_MIN_VOLUME_24H_USD = Number(process.env.DISCOVER_MIN_VOLUME_24H_USD || "120000");
+export const DISCOVER_MIN_TX_24H = Number(process.env.DISCOVER_MIN_TX_24H || "180");

@@ -62,6 +62,17 @@ export default function RootLayout({
                   Trade on FOMO
                 </a>
               </div>
+              <p>
+                Created by{" "}
+                <a
+                  className="text-emerald-300 hover:text-emerald-200"
+                  href="https://x.com/Adam_Sven_"
+                  target="_blank"
+                  rel="noreferrer nofollow noopener"
+                >
+                  @Adam_Sven_
+                </a>
+              </p>
             </div>
           </footer>
         </SolanaWalletProvider>

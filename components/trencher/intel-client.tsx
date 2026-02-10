@@ -22,6 +22,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Globe, Twitter } from "lucide-react";
 
 const intervals: Interval[] = ["5m", "1h", "24h", "7d"];
 
@@ -58,6 +59,10 @@ function gmgnInterval(interval: Interval): string {
 function normalizeTsSeconds(t: number): number {
   if (!Number.isFinite(t)) return 0;
   return t > 10_000_000_000 ? Math.floor(t / 1000) : Math.floor(t);
+}
+
+function fmtChartTime(tsSec: number) {
+  return new Date(tsSec * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function backsolvePrice(current: number | null, changePct: number | null): number | null {
@@ -200,13 +205,13 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               .filter((c) => Number.isFinite(c.t) && Number.isFinite(c.c))
               .map((c) => ({
                 t: normalizeTsSeconds(c.t),
-                label: new Date(normalizeTsSeconds(c.t) * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 close: Number(c.c),
                 open: Number(c.o),
                 high: Number(c.h),
                 low: Number(c.l),
                 volume: Number(c.v),
-              }));
+              }))
+              .sort((a, b) => a.t - b.t);
             const nowSec = Math.floor(Date.now() / 1000);
             const inferredBase =
               data.market.priceUsd ??
@@ -218,11 +223,11 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
             const p1h = backsolvePrice(pNow, data.market.priceChange.h1);
             const p24h = backsolvePrice(pNow, data.market.priceChange.h24);
             const syntheticPoints = [
-              { t: nowSec - 24 * 3600, label: "24h", close: p24h ?? pNow, open: p24h ?? pNow, high: p24h ?? pNow, low: p24h ?? pNow, volume: 0 },
-              { t: nowSec - 3600, label: "1h", close: p1h ?? pNow, open: p1h ?? pNow, high: p1h ?? pNow, low: p1h ?? pNow, volume: 0 },
-              { t: nowSec - 300, label: "5m", close: p5m ?? pNow, open: p5m ?? pNow, high: p5m ?? pNow, low: p5m ?? pNow, volume: 0 },
-              { t: nowSec, label: "now", close: pNow, open: pNow, high: pNow, low: pNow, volume: 0 },
-            ];
+              { t: nowSec - 24 * 3600, close: p24h ?? pNow, open: p24h ?? pNow, high: p24h ?? pNow, low: p24h ?? pNow, volume: 0 },
+              { t: nowSec - 3600, close: p1h ?? pNow, open: p1h ?? pNow, high: p1h ?? pNow, low: p1h ?? pNow, volume: 0 },
+              { t: nowSec - 300, close: p5m ?? pNow, open: p5m ?? pNow, high: p5m ?? pNow, low: p5m ?? pNow, volume: 0 },
+              { t: nowSec, close: pNow, open: pNow, high: pNow, low: pNow, volume: 0 },
+            ].sort((a, b) => a.t - b.t);
             const chartSeries = nativePoints.length > 1 ? nativePoints : syntheticPoints;
             const gmgnSrc = `https://www.gmgn.cc/kline/sol/${data.mint}?interval=${encodeURIComponent(
               gmgnInterval(interval),
@@ -282,8 +287,9 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                     href={data.identity.socials.website}
                     target="_blank"
                     rel="noreferrer nofollow noopener"
-                    className="rounded border border-white/15 px-2 py-1 text-white/75 hover:text-white"
+                    className="inline-flex items-center gap-1 rounded border border-white/15 px-2 py-1 text-white/75 hover:text-white"
                   >
+                    <Globe className="h-3.5 w-3.5" />
                     Website
                   </a>
                 )}
@@ -292,8 +298,9 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                     href={data.identity.socials.twitter}
                     target="_blank"
                     rel="noreferrer nofollow noopener"
-                    className="rounded border border-white/15 px-2 py-1 text-white/75 hover:text-white"
+                    className="inline-flex items-center gap-1 rounded border border-white/15 px-2 py-1 text-white/75 hover:text-white"
                   >
+                    <Twitter className="h-3.5 w-3.5" />
                     X/Twitter
                   </a>
                 )}
@@ -342,6 +349,12 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 </TabsList>
               </Tabs>
             </div>
+            <div className="mb-3 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70 md:grid-cols-4">
+              <div>Price <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.priceUsd)}</span></div>
+              <div>24h <span className="ml-1 font-semibold text-white">{fmtPct(data.market.priceChange.h24)}</span></div>
+              <div>Liq <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.liquidityUsd)}</span></div>
+              <div>Vol <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.volume24hUsd)}</span></div>
+            </div>
             <div className="h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
               {chartSource === "gmgn" && (
                 <iframe
@@ -363,7 +376,14 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="#16303a" strokeDasharray="4 4" />
-                    <XAxis dataKey="label" minTickGap={28} tick={{ fill: "#8fa3b4", fontSize: 11 }} />
+                    <XAxis
+                      dataKey="t"
+                      type="number"
+                      domain={["dataMin", "dataMax"]}
+                      tickFormatter={(v) => fmtChartTime(Number(v))}
+                      minTickGap={28}
+                      tick={{ fill: "#8fa3b4", fontSize: 11 }}
+                    />
                     <YAxis
                       tick={{ fill: "#8fa3b4", fontSize: 11 }}
                       width={76}
@@ -376,6 +396,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                         borderRadius: "8px",
                         color: "#e5eef6",
                       }}
+                      labelFormatter={(v) => fmtChartTime(Number(v))}
                       formatter={(value: number, name: string) => {
                         if (name === "close") return [`$${Number(value).toFixed(8)}`, "Close"];
                         if (name === "open") return [`$${Number(value).toFixed(8)}`, "Open"];

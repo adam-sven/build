@@ -30,7 +30,7 @@ import { kvDel, kvSetNx } from "@/lib/trencher/kv";
 
 async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
   if (chain !== "solana") return [];
-  const queries = ["sol", "pump", "pumpswap", "pumpfun", "meme", "ai", "new", "moon"];
+  const queries = ["pump", "pumpswap", "pumpfun", "sol"];
   const out = new Set<string>();
 
   for (const q of queries) {
@@ -52,10 +52,10 @@ async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
         const h24 = Number(p?.priceChange?.h24 || 0);
         const mint = p?.baseToken?.address;
         if (!mint) continue;
-        if (liq < 10_000 || vol < 30_000 || tx24 < 60) continue;
+        if (liq < 20_000 || vol < 100_000 || tx24 < 120) continue;
         if (Number.isFinite(h24) && h24 <= -96) continue;
         out.add(String(mint));
-        if (out.size >= 180) return [...out];
+        if (out.size >= 120) return [...out];
       }
     } catch {
       // continue
@@ -259,7 +259,7 @@ export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promi
       const fallback = await fetchDexFallbackCandidates(chain);
       candidates = Array.from(new Set([...candidates, ...fallback]));
     }
-    const sampled = candidates.slice(0, 140);
+    const sampled = candidates.slice(0, 90);
     const tokens = await Promise.all(
       sampled.map(async (mint) => {
         try {
