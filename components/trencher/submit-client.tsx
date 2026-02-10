@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,7 @@ function bytesToBase64(bytes: Uint8Array) {
 
 export default function SubmitClient() {
   const router = useRouter();
-  const { connection } = useConnection();
-  const { publicKey, connected, signMessage, sendTransaction } = useWallet();
+  const { publicKey, connected, signMessage, signTransaction, sendTransaction } = useWallet();
 
   const [mint, setMint] = useState("");
   const [step, setStep] = useState<1 | 2>(1);
@@ -66,8 +65,33 @@ export default function SubmitClient() {
           lamports: SUBMIT_FEE_LAMPORTS,
         }),
       );
-      const feeTxSig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(feeTxSig, "confirmed");
+
+      let feeTxSig: string | null = null;
+      if (signTransaction) {
+        const bhRes = await fetch("/api/ui/solana/blockhash");
+        const bh = await bhRes.json();
+        if (!bhRes.ok) throw new Error(bh?.error?.message || "Failed to get recent blockhash");
+        tx.feePayer = publicKey;
+        tx.recentBlockhash = bh.blockhash;
+
+        const signed = await signTransaction(tx);
+        const txBase64 = Buffer.from(signed.serialize()).toString("base64");
+        const sendRes = await fetch("/api/ui/solana/send-fee-transaction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "submit", txBase64 }),
+        });
+        const sent = await sendRes.json();
+        if (!sendRes.ok) throw new Error(sent?.error?.message || "Failed to broadcast fee transaction");
+        feeTxSig = sent.signature;
+      } else if (sendTransaction) {
+        const { Connection } = await import("@solana/web3.js");
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+        feeTxSig = await sendTransaction(tx, connection);
+        await connection.confirmTransaction(feeTxSig, "confirmed");
+      } else {
+        throw new Error("Wallet does not support signing transactions.");
+      }
 
       const confirmRes = await fetch("/api/ui/submit/confirm", {
         method: "POST",

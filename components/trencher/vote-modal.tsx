@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { SystemProgram, Transaction, PublicKey } from "@solana/web3.js";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TREASURY_PUBKEY, VOTE_FEE_LAMPORTS } from "@/lib/trencher/public";
@@ -23,14 +23,13 @@ function bytesToBase64(bytes: Uint8Array) {
 }
 
 export default function VoteModal({ mint, direction, onClose, onSuccess }: Props) {
-  const { connection } = useConnection();
-  const { publicKey, signMessage, sendTransaction } = useWallet();
+  const { publicKey, signMessage, signTransaction, sendTransaction } = useWallet();
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
-    if (!publicKey || !signMessage || !sendTransaction) {
+    if (!publicKey || !signMessage) {
       setError("Connect wallet first.");
       return;
     }
@@ -59,8 +58,35 @@ export default function VoteModal({ mint, direction, onClose, onSuccess }: Props
           lamports: VOTE_FEE_LAMPORTS,
         }),
       );
-      const feeTxSig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(feeTxSig, "confirmed");
+
+      let feeTxSig: string | null = null;
+      if (signTransaction) {
+        // Avoid relying on the browser RPC for blockhash (some endpoints return 403 to browsers).
+        const bhRes = await fetch("/api/ui/solana/blockhash");
+        const bh = await bhRes.json();
+        if (!bhRes.ok) throw new Error(bh?.error?.message || "Failed to get recent blockhash");
+        tx.feePayer = publicKey;
+        tx.recentBlockhash = bh.blockhash;
+
+        const signed = await signTransaction(tx);
+        const txBase64 = Buffer.from(signed.serialize()).toString("base64");
+        const sendRes = await fetch("/api/ui/solana/send-fee-transaction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "vote", txBase64 }),
+        });
+        const sent = await sendRes.json();
+        if (!sendRes.ok) throw new Error(sent?.error?.message || "Failed to broadcast fee transaction");
+        feeTxSig = sent.signature;
+      } else if (sendTransaction) {
+        // Fallback: old path (may fail if the user's browser RPC blocks blockhash requests).
+        const { Connection } = await import("@solana/web3.js");
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+        feeTxSig = await sendTransaction(tx, connection);
+        await connection.confirmTransaction(feeTxSig, "confirmed");
+      } else {
+        throw new Error("Wallet does not support signing transactions.");
+      }
 
       const submitRes = await fetch(`/api/ui/vote/submit`, {
         method: "POST",
