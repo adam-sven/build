@@ -1,4 +1,5 @@
 import type { Candle, Chain, Interval, MarketSnapshot, TokenIdentity } from "@/lib/trencher/types";
+import { getAssetMetadata } from "@/lib/trencher/helius";
 
 const FETCH_TIMEOUT_MS = 7_500;
 
@@ -85,18 +86,21 @@ export class DexscreenerMarketProvider {
   async getTokenMarket(chain: Chain, mint: string): Promise<{ identity: TokenIdentity; market: MarketSnapshot }> {
     const pair = await this.getPrimaryPair(chain, mint);
     const jupToken = await this.getJupToken(mint);
-    if (!pair && !jupToken) throw new Error("provider_error");
+    const heliusMeta = await getAssetMetadata(mint);
+    if (!pair && !jupToken && !heliusMeta.name && !heliusMeta.symbol && !heliusMeta.image) {
+      throw new Error("provider_error");
+    }
     const pairSocials = this.extractSocials(pair);
 
     return {
       identity: {
-        name: pair?.baseToken?.name || jupToken?.name || null,
-        symbol: pair?.baseToken?.symbol || jupToken?.symbol || null,
-        image: pair?.info?.imageUrl || jupToken?.logoURI || null,
+        name: pair?.baseToken?.name || jupToken?.name || heliusMeta.name || null,
+        symbol: pair?.baseToken?.symbol || jupToken?.symbol || heliusMeta.symbol || null,
+        image: pair?.info?.imageUrl || jupToken?.logoURI || heliusMeta.image || null,
         socials: {
-          website: pairSocials.website || jupToken?.extensions?.website || null,
-          twitter: pairSocials.twitter || jupToken?.extensions?.twitter || null,
-          telegram: pairSocials.telegram || jupToken?.extensions?.telegram || null,
+          website: pairSocials.website || jupToken?.extensions?.website || heliusMeta.website || null,
+          twitter: pairSocials.twitter || jupToken?.extensions?.twitter || heliusMeta.twitter || null,
+          telegram: pairSocials.telegram || jupToken?.extensions?.telegram || heliusMeta.telegram || null,
         },
       },
       market: {

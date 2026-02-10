@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import ConnectButton from "@/components/wallet/connect-button";
 import { BarChart3, FileText, LayoutDashboard, Search, Shield, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -52,7 +51,6 @@ export default function TrencherNav() {
                 <Image src="/trencher-mark.svg" alt="Trencher" width={18} height={18} className="h-[18px] w-[18px]" />
                 Trencher
               </Link>
-              <ConnectButton />
             </div>
             <nav className="space-y-1">
               {LINKS.map((item) => {
@@ -122,9 +120,6 @@ export default function TrencherNav() {
             >
               Trade FOMO
             </a>
-          </div>
-          <div className="mt-auto pt-3">
-            <ConnectButton />
           </div>
         </div>
       </aside>

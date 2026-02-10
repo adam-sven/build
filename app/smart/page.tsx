@@ -73,6 +73,7 @@ type SmartWalletSnapshot = {
 const shortAddr = (addr: string, start = 6, end = 6) => {
   return `${addr.slice(0, start)}...${addr.slice(-end)}`;
 };
+const isLikelyMint = (v: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v);
 
 const formatBlockTime = (val: number | null) => {
   if (!val) return '—';
@@ -166,7 +167,9 @@ export default function SmartWalletsPage() {
   }, [data, walletFilter]);
 
   const topMints = useMemo(() => {
-    const list = [...(data?.topMints || [])].sort((a, b) => {
+    const list = [...(data?.topMints || [])]
+      .filter((item) => isLikelyMint(String(item?.mint || "")))
+      .sort((a, b) => {
       const aKnown = (a.token?.name || a.token?.symbol || a.token?.image) ? 1 : 0;
       const bKnown = (b.token?.name || b.token?.symbol || b.token?.image) ? 1 : 0;
       if (bKnown !== aKnown) return bKnown - aKnown;
@@ -398,9 +401,11 @@ export default function SmartWalletsPage() {
                           </div>
 
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <Button asChild className="h-8 rounded-lg bg-emerald-400 text-black hover:opacity-90">
-                              <Link href={`/intel?mint=${token.mint}`}>Open Intel</Link>
-                            </Button>
+                            {isLikelyMint(token.mint) && (
+                              <Button asChild className="h-8 rounded-lg bg-emerald-400 text-black hover:opacity-90">
+                                <Link href={`/intel?mint=${token.mint}`}>Open Intel</Link>
+                              </Button>
+                            )}
                             <Button asChild variant="outline" className="h-8 rounded-lg border-white/20 bg-white/5 text-white hover:bg-white/10">
                               <a
                                 href={token.token.pairUrl || `https://dexscreener.com/solana/${token.mint}`}

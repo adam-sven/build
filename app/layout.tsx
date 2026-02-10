@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import TrencherNav from '@/components/trencher-nav'
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
+import ConnectButton from '@/components/wallet/connect-button'
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 import './globals.css'
@@ -28,6 +29,9 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <SolanaWalletProvider>
           <TrencherNav />
+          <div className="fixed right-3 top-3 z-[70] md:right-4 md:top-4">
+            <ConnectButton />
+          </div>
           <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-20%,#0d1f34_0%,transparent_55%),radial-gradient(900px_500px_at_90%_-10%,#06251c_0%,transparent_55%),#04060a] text-white md:pl-56">
             {children}
           </div>

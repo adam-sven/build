@@ -122,3 +122,34 @@ body {
 .wallet-adapter-dropdown-list-item {
   font-size: 12px !important;
 }
+
+.wallet-adapter-modal-wrapper {
+  background: #090d14 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.65) !important;
+}
+
+.wallet-adapter-modal-title {
+  color: #f1f5f9 !important;
+  font-size: 32px !important;
+  line-height: 1.2 !important;
+}
+
+.wallet-adapter-modal-list {
+  margin: 8px 0 !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  height: 44px !important;
+  border-radius: 10px !important;
+}
+
+.wallet-adapter-modal-list-more {
+  color: rgba(241, 245, 249, 0.85) !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(241, 245, 249, 0.8) !important;
+}

@@ -8,6 +8,14 @@ const holderStatsCache = new Map<
     data: { holderCount: number | null; top10Pct: number | null; topHolders: { wallet: string; pct: number }[] };
   }
 >();
+const assetMetaCache = new Map<
+  string,
+  {
+    at: number;
+    data: { name: string | null; symbol: string | null; image: string | null; website: string | null; twitter: string | null; telegram: string | null };
+  }
+>();
+const ASSET_META_TTL_MS = Number(process.env.ASSET_META_TTL_MS || `${60 * 60 * 1000}`);
 
 export function getConnection() {
   const rpcUrl =
@@ -119,5 +127,57 @@ export async function getSolBalance(wallet: string): Promise<number | null> {
     return lamports / LAMPORTS_PER_SOL;
   } catch {
     return null;
+  }
+}
+
+export async function getAssetMetadata(mint: string): Promise<{
+  name: string | null;
+  symbol: string | null;
+  image: string | null;
+  website: string | null;
+  twitter: string | null;
+  telegram: string | null;
+}> {
+  const cached = assetMetaCache.get(mint);
+  if (cached && Date.now() - cached.at < ASSET_META_TTL_MS) {
+    return cached.data;
+  }
+
+  const apiKey = process.env.HELIUS_API_KEY;
+  if (!apiKey) {
+    return { name: null, symbol: null, image: null, website: null, twitter: null, telegram: null };
+  }
+
+  try {
+    const url = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "asset-meta",
+        method: "getAsset",
+        params: { id: mint },
+      }),
+    });
+    if (!res.ok) {
+      return { name: null, symbol: null, image: null, website: null, twitter: null, telegram: null };
+    }
+    const json = await res.json();
+    const content = json?.result?.content || {};
+    const links = content?.links || {};
+    const metadata = content?.metadata || {};
+    const out = {
+      name: typeof metadata?.name === "string" ? metadata.name : null,
+      symbol: typeof metadata?.symbol === "string" ? metadata.symbol : null,
+      image: typeof links?.image === "string" ? links.image : null,
+      website: typeof links?.external_url === "string" ? links.external_url : null,
+      twitter: typeof links?.twitter === "string" ? links.twitter : null,
+      telegram: typeof links?.telegram === "string" ? links.telegram : null,
+    };
+    assetMetaCache.set(mint, { at: Date.now(), data: out });
+    return out;
+  } catch {
+    return { name: null, symbol: null, image: null, website: null, twitter: null, telegram: null };
   }
 }
