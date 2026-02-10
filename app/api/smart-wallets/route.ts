@@ -119,6 +119,8 @@ async function hydrateTopMintMeta(data: any) {
         change24h: row.token?.change24h ?? pair?.priceChange?.h24 ?? null,
         volume24h: row.token?.volume24h ?? pair?.volume?.h24 ?? null,
         liquidityUsd: row.token?.liquidityUsd ?? pair?.liquidity?.usd ?? null,
+        marketCapUsd: row.token?.marketCapUsd ?? pair?.marketCap ?? null,
+        fdvUsd: row.token?.fdvUsd ?? pair?.fdv ?? null,
         pairUrl: row.token?.pairUrl || pair?.url || null,
         dex: row.token?.dex || pair?.dexId || null,
       };

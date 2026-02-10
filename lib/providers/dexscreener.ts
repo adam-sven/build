@@ -80,7 +80,32 @@ export class DexscreenerMarketProvider {
     const pair = pairs
       .filter((p: any) => p?.chainId === "solana")
       .sort((a: any, b: any) => Number(b?.liquidity?.usd || 0) - Number(a?.liquidity?.usd || 0))[0];
-    return pair || null;
+    if (pair) return pair;
+
+    // Fallback query: some new pairs lag on token endpoint but can be found via search.
+    const searchController = new AbortController();
+    const searchTimeout = setTimeout(() => searchController.abort(), FETCH_TIMEOUT_MS);
+    const searchRes = await fetch(
+      `https://api.dexscreener.com/latest/dex/search/?q=${encodeURIComponent(mint)}`,
+      {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: searchController.signal,
+      },
+    ).catch(() => null);
+    clearTimeout(searchTimeout);
+    if (!searchRes || !searchRes.ok) return null;
+    const searchJson = await searchRes.json();
+    const searchPairs = Array.isArray(searchJson?.pairs) ? searchJson.pairs : [];
+    const best = searchPairs
+      .filter((p: any) => p?.chainId === "solana")
+      .sort((a: any, b: any) => {
+        const aMintMatch = String(a?.baseToken?.address || "") === mint ? 1 : 0;
+        const bMintMatch = String(b?.baseToken?.address || "") === mint ? 1 : 0;
+        if (bMintMatch !== aMintMatch) return bMintMatch - aMintMatch;
+        return Number(b?.liquidity?.usd || 0) - Number(a?.liquidity?.usd || 0);
+      })[0];
+    return best || null;
   }
 
   async getTokenMarket(chain: Chain, mint: string): Promise<{ identity: TokenIdentity; market: MarketSnapshot }> {

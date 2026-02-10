@@ -13,7 +13,7 @@ export default function Page() {
   const [hasAccess, setHasAccess] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [openEntryId, setOpenEntryId] = useState<number | null>(8);
+  const [openEntryId, setOpenEntryId] = useState<number | null>(10);
 
   // Check token access in one place for easy future SPL token balance check
   const checkAccess = async (wallet: string): Promise<boolean> => {
@@ -47,6 +47,62 @@ export default function Page() {
   };
 
   const entries = [
+    {
+      id: 10,
+      title: 'Experiment #10 — Webhook Health + Smart Token Meta Fill (v1.7)',
+      date: '2026-02-10',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Added webhook health endpoint for Helius ingest visibility.',
+            'Extended Smart Wallet token metadata pipeline with market cap / FDV propagation.',
+            'Added Dex search fallback in market provider to reduce Intel cards with missing market fields.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'The system needed an explicit way to verify webhook ingestion and a stronger metadata path so Smart Wallet and Intel views show fewer blank market fields during provider lag.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            '`/api/ingest/helius/health` returns event count, last ingest time/count, and snapshot freshness stats.',
+            'Webhook ingest now stores last-ingest metrics in Redis/KV for operational checks.',
+            'Top-mint token objects now include `marketCapUsd` and `fdvUsd` through ingest + API hydration.',
+            'Smart Wallet top-token UI now prints market cap directly in list + expanded panel.',
+            'Dex provider now tries `/latest/dex/search` when token endpoint is empty.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not full exchange-grade tick reconstruction.',
+            'Not guaranteed full metadata for every fresh mint instantly.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'Some mints still have sparse data when all upstreams return null simultaneously.',
+            'Native chart still depends on available OHLC stream depth for the selected pool/interval.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Add webhook-status badge in Smart Wallet header and backfill-only queue for unresolved mints so missing fields are retried in the background.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/api/ingest/helius/health',
+            '/api/smart-wallets',
+            '/smart',
+            '/intel'
+          ]
+        }
+      ]
+    },
     {
       id: 9,
       title: 'Experiment #9 — Live Worker + Redis Pipeline (v1.6)',

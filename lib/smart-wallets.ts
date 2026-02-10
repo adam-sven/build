@@ -48,6 +48,8 @@ export type TopMint = {
     change24h: number | null;
     volume24h: number | null;
     liquidityUsd: number | null;
+    marketCapUsd: number | null;
+    fdvUsd: number | null;
     pairUrl: string | null;
     dex: string | null;
   };
@@ -336,6 +338,8 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
       change24h: pair?.priceChange?.h24 ?? null,
       volume24h: pair?.volume?.h24 ?? null,
       liquidityUsd: pair?.liquidity?.usd ?? null,
+      marketCapUsd: pair?.marketCap ?? null,
+      fdvUsd: pair?.fdv ?? null,
       pairUrl: pair?.url || null,
       dex: pair?.dexId || null,
     };
@@ -377,6 +381,8 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
         change24h: null,
         volume24h: null,
         liquidityUsd: null,
+        marketCapUsd: null,
+        fdvUsd: null,
         pairUrl: null,
         dex: null,
       };
@@ -418,6 +424,8 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
             change24h: null,
             volume24h: null,
             liquidityUsd: null,
+            marketCapUsd: null,
+            fdvUsd: null,
             pairUrl: null,
             dex: null,
           };
@@ -438,6 +446,8 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
     change24h: null,
     volume24h: null,
     liquidityUsd: null,
+    marketCapUsd: null,
+    fdvUsd: null,
     pairUrl: null,
     dex: null,
   };
@@ -552,6 +562,8 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       change24h: null,
       volume24h: null,
       liquidityUsd: null,
+      marketCapUsd: null,
+      fdvUsd: null,
       pairUrl: null,
       dex: null,
     },

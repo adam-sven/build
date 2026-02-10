@@ -58,6 +58,8 @@ type SmartSnapshotLike = {
       change24h: number | null;
       volume24h: number | null;
       liquidityUsd: number | null;
+      marketCapUsd: number | null;
+      fdvUsd: number | null;
       pairUrl: string | null;
       dex: string | null;
     };
@@ -72,6 +74,8 @@ type SmartSnapshotLike = {
 
 const EVENTS_KEY = "trencher:helius:wallet_events:v1";
 const SNAPSHOT_KEY = "trencher:helius:smart_snapshot:v1";
+const LAST_INGEST_AT_KEY = "trencher:helius:last_ingest_at:v1";
+const LAST_INGEST_COUNT_KEY = "trencher:helius:last_ingest_count:v1";
 const DEFAULT_TTL_SECONDS = Number(process.env.SMART_EVENT_TTL_SEC || `${24 * 3600}`);
 const MAX_EVENTS = Number(process.env.SMART_EVENT_MAX || "12000");
 const SNAPSHOT_TTL_SECONDS = Number(process.env.SMART_EVENT_SNAPSHOT_TTL_SEC || "1200");
@@ -152,6 +156,8 @@ async function getMintMeta(mint: string) {
           change24h: pair?.priceChange?.h24 ?? null,
           volume24h: pair?.volume?.h24 ?? null,
           liquidityUsd: pair?.liquidity?.usd ?? null,
+          marketCapUsd: pair?.marketCap ?? null,
+          fdvUsd: pair?.fdv ?? null,
           pairUrl: pair?.url || null,
           dex: pair?.dexId || null,
         };
@@ -171,6 +177,8 @@ async function getMintMeta(mint: string) {
       change24h: null,
       volume24h: null,
       liquidityUsd: null,
+      marketCapUsd: null,
+      fdvUsd: null,
       pairUrl: null,
       dex: null,
     };
@@ -184,6 +192,8 @@ async function getMintMeta(mint: string) {
     change24h: null,
     volume24h: null,
     liquidityUsd: null,
+    marketCapUsd: null,
+    fdvUsd: null,
     pairUrl: null,
     dex: null,
   };
@@ -250,6 +260,8 @@ export async function storeWalletEvents(events: LiveWalletEvent[]) {
     .sort((a, b) => b.blockTime - a.blockTime)
     .slice(0, MAX_EVENTS);
   await kvSet(EVENTS_KEY, merged, DEFAULT_TTL_SECONDS);
+  await kvSet(LAST_INGEST_AT_KEY, new Date().toISOString(), DEFAULT_TTL_SECONDS);
+  await kvSet(LAST_INGEST_COUNT_KEY, events.length, DEFAULT_TTL_SECONDS);
   return { stored: events.length, total: merged.length };
 }
 
@@ -358,6 +370,8 @@ export async function buildSmartSnapshotFromEvents(): Promise<SmartSnapshotLike 
       change24h: null,
       volume24h: null,
       liquidityUsd: null,
+      marketCapUsd: null,
+      fdvUsd: null,
       pairUrl: null,
       dex: null,
     },
@@ -404,4 +418,22 @@ export async function refreshAndStoreSmartSnapshotFromEvents() {
   if (!snapshot) return null;
   await kvSet(SNAPSHOT_KEY, snapshot, SNAPSHOT_TTL_SECONDS);
   return snapshot;
+}
+
+export async function getHeliusIngestHealth() {
+  const [events, snapshot, lastIngestAt, lastIngestCount] = await Promise.all([
+    kvGet<LiveWalletEvent[]>(EVENTS_KEY),
+    kvGet<SmartSnapshotLike>(SNAPSHOT_KEY),
+    kvGet<string>(LAST_INGEST_AT_KEY),
+    kvGet<number>(LAST_INGEST_COUNT_KEY),
+  ]);
+
+  return {
+    eventCount: Array.isArray(events) ? events.length : 0,
+    snapshotAt: snapshot?.timestamp || null,
+    snapshotActiveWallets: snapshot?.stats?.activeWallets ?? 0,
+    snapshotTrackedMints: snapshot?.stats?.totalTrackedMints ?? 0,
+    lastIngestAt: lastIngestAt || null,
+    lastIngestCount: Number.isFinite(lastIngestCount as number) ? (lastIngestCount as number) : 0,
+  };
 }

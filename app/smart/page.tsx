@@ -49,6 +49,8 @@ type TopMint = {
     change24h: number | null;
     volume24h: number | null;
     liquidityUsd: number | null;
+    marketCapUsd: number | null;
+    fdvUsd: number | null;
     pairUrl: string | null;
     dex: string | null;
   };
@@ -368,7 +370,7 @@ export default function SmartWalletsPage() {
                             </span>
                           </div>
                           <div className="mt-1 text-xs text-white/50">
-                            {token.walletCount} wallets • {token.buyCount} buys • Liq {formatUsd(token.token.liquidityUsd)} • Vol {formatUsd(token.token.volume24h)}
+                            {token.walletCount} wallets • {token.buyCount} buys • Mcap {formatUsd(token.token.marketCapUsd)} • Liq {formatUsd(token.token.liquidityUsd)} • Vol {formatUsd(token.token.volume24h)}
                           </div>
                         </div>
                         <div className={`text-sm font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
@@ -384,6 +386,9 @@ export default function SmartWalletsPage() {
                             </div>
                             <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
                               Volume: <span className="text-white/80">{formatUsd(token.token.volume24h)}</span>
+                            </div>
+                            <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
+                              Mcap: <span className="text-white/80">{formatUsd(token.token.marketCapUsd)}</span>
                             </div>
                           </div>
 
