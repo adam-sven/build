@@ -47,6 +47,20 @@ function pct(v: number | null) {
   return `${s}${v.toFixed(2)}%`;
 }
 
+function fmtPrice(item: TokenRowSummary) {
+  const v = item.priceUsd;
+  if (v === null || v <= 0) return "-";
+  if (v < 0.0001) return `$${v.toFixed(8)}`;
+  if (v < 1) return `$${v.toFixed(6)}`;
+  return `$${v.toFixed(4)}`;
+}
+
+function fmtTx(v: number | null) {
+  if (v === null) return "-";
+  if (v > 1000) return `${(v / 1000).toFixed(1)}k`;
+  return String(v);
+}
+
 type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
 
 const SOURCE_META: Record<SourceFilter, { label: string; icon: string }> = {
@@ -171,59 +185,45 @@ export default function DiscoverClient() {
 
       <div className="hidden overflow-hidden rounded-xl border border-white/10 md:block">
         <div className="grid grid-cols-12 bg-black/40 px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
-          <div className="col-span-3">Token</div>
-          <div className="col-span-2">Market</div>
-          <div className="col-span-2">Change</div>
-          <div className="col-span-1">Search</div>
-          <div className="col-span-2">Votes</div>
-          <div className="col-span-1">Why</div>
-          <div className="col-span-1">Flags</div>
+          <div className="col-span-4">Token</div>
+          <div className="col-span-1">Price</div>
+          <div className="col-span-1">Txns</div>
+          <div className="col-span-1">5m</div>
+          <div className="col-span-1">1h</div>
+          <div className="col-span-1">24h</div>
+          <div className="col-span-1">Liq</div>
+          <div className="col-span-1">Mcap</div>
+          <div className="col-span-1">Votes</div>
         </div>
         {filtered.map((item) => (
-          <div key={item.mint} className="grid grid-cols-12 items-start border-t border-white/5 px-3 py-3 text-sm">
-            <div className="col-span-3">
+          <div key={item.mint} className="grid grid-cols-12 items-center border-t border-white/5 px-3 py-2 text-sm">
+            <div className="col-span-4">
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div>
                   <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
-                    <span className="grid h-7 w-7 place-items-center rounded-md bg-black/40">
-                      <SourceIcon source={item.source as SourceFilter} className="h-6 w-6" />
+                    <span className="grid h-7 w-7 place-items-center rounded-md bg-black/20">
+                      <SourceIcon source={item.source as SourceFilter} className="h-7 w-7" />
                     </span>
                     <span>{item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span></span>
                   </Link>
                   <div className="text-xs text-white/45">{shortMint(item.mint)}</div>
-                  {item.peakRank > 0 && <div className="mt-1 text-xs text-cyan-300">Peak #{item.peakRank}</div>}
                 </div>
               </div>
             </div>
-            <div className="col-span-2 text-xs text-white/70">
-              <div>MC/FDV {usd(item.marketCapUsd)}/{usd(item.fdvUsd)}</div>
-              <div>Liq {usd(item.liquidityUsd)}</div>
-              <div>Vol {usd(item.volume24hUsd)}</div>
-            </div>
-            <div className="col-span-2 text-xs">
-              <div>{pct(item.priceChange.m5)}</div>
-              <div>{pct(item.priceChange.h1)}</div>
-              <div>{pct(item.priceChange.h24)}</div>
-            </div>
-            <div className="col-span-1 text-xs">{item.search.trending ? "🔍" : "-"}</div>
-            <div className="col-span-2 text-xs">
-              <div className="mb-1">{item.votes.up24h}/{item.votes.down24h} ({item.votes.score24h})</div>
+            <div className="col-span-1 text-xs">{fmtPrice(item)}</div>
+            <div className="col-span-1 text-xs">{fmtTx(item.txCount24h)}</div>
+            <div className="col-span-1 text-xs">{pct(item.priceChange.m5)}</div>
+            <div className="col-span-1 text-xs">{pct(item.priceChange.h1)}</div>
+            <div className="col-span-1 text-xs">{pct(item.priceChange.h24)}</div>
+            <div className="col-span-1 text-xs">{usd(item.liquidityUsd)}</div>
+            <div className="col-span-1 text-xs">{usd(item.marketCapUsd)}</div>
+            <div className="col-span-1 text-xs">
+              <div className="mb-1">{item.votes.score24h}</div>
               <div className="flex gap-1">
-                <Button size="sm" variant="outline" className="h-7 border-white/20" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>▲</Button>
-                <Button size="sm" variant="outline" className="h-7 border-white/20" onClick={() => setVoteTarget({ mint: item.mint, direction: "down" })}>▼</Button>
+                <Button size="sm" variant="outline" className="h-7 border-white/20 px-2" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>▲</Button>
+                <Button size="sm" variant="outline" className="h-7 border-white/20 px-2" onClick={() => setVoteTarget({ mint: item.mint, direction: "down" })}>▼</Button>
               </div>
-            </div>
-            <div className="col-span-1 text-[11px] text-white/65">{item.why.slice(0, 2).map((x, idx) => <div key={idx}>• {x}</div>)}</div>
-            <div className="col-span-1 text-[11px] text-white/65">
-              {item.flags.confidence >= 65 ? (
-                <>
-                  <div>B:{item.flags.bundles}</div>
-                  <div>R:{item.flags.botRisk}</div>
-                </>
-              ) : (
-                <div>Unknown</div>
-              )}
             </div>
           </div>
         ))}
@@ -248,11 +248,11 @@ export default function DiscoverClient() {
               <div className="text-xs">{item.votes.score24h}</div>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-white/70">
+              <div>Price {fmtPrice(item)}</div>
               <div>Liq {usd(item.liquidityUsd)}</div>
               <div>Vol {usd(item.volume24hUsd)}</div>
               <div>MC {usd(item.marketCapUsd)}</div>
             </div>
-            <div className="mt-2 text-xs text-white/65">{item.why.slice(0, 2).map((x, idx) => <div key={idx}>• {x}</div>)}</div>
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="outline" className="h-7 border-white/20" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>Upvote</Button>
               <Button size="sm" variant="outline" className="h-7 border-white/20" onClick={() => setVoteTarget({ mint: item.mint, direction: "down" })}>Downvote</Button>

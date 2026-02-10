@@ -48,6 +48,65 @@ export default function Page() {
 
   const entries = [
     {
+      id: 9,
+      title: 'Experiment #9 — Live Worker + Redis Pipeline (v1.6)',
+      date: '2026-02-10',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Moved refresh workload to an always-on live worker path and confirmed stable `updated/fresh/locked` tick behavior.',
+            'Added Redis-backed shared cache + lock flow for feed and smart-wallet freshness.',
+            'Added Helius webhook sync tooling so watched wallets can be managed without manual dashboard edits.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'Polling from user page-loads created bursty latency and unnecessary RPC burn. This iteration tests a warm-cache pipeline: one updater, many readers.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Worker calls `/api/live/tick` on interval using `LIVE_TICK_SECRET`.',
+            'Tick endpoint acquires distributed lock in Redis before expensive refresh work.',
+            'UI endpoints serve cached snapshots with stale-while-revalidate behavior.',
+            'Webhook ingest stores wallet events for smart-wallet views and leaderboard derivation.',
+            '`pnpm helius:sync-wallets` updates webhook wallet set from local tracked-wallet config.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not a full real-time chain indexer.',
+            'Not guaranteed complete metadata on every mint instantly.',
+            'Not a replacement for dedicated chart terminals.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'Native OHLC remains sparse for some pairs; GMGN chart still needed as primary view in those cases.',
+            'Wallet sampled PnL is directional and not a full accounting ledger.',
+            'Webhook quality depends on wallet set + selected transaction types.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Shift Discover candidate generation to webhook/event deltas first, with strict quality gates before any fallback scans.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/api/live/tick',
+            '/api/ingest/helius',
+            '/smart',
+            'scripts/live-worker.mjs',
+            'scripts/helius-sync-webhook.mjs'
+          ]
+        }
+      ]
+    },
+    {
       id: 8,
       title: 'Experiment #8 — Live Pipeline Hardening + Feed Quality Gates (v1.5)',
       date: '2026-02-09',

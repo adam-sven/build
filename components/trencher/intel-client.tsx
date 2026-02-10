@@ -65,14 +65,6 @@ function fmtChartTime(tsSec: number) {
   return new Date(tsSec * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function backsolvePrice(current: number | null, changePct: number | null): number | null {
-  if (current === null || !Number.isFinite(current) || current <= 0) return null;
-  if (changePct === null || !Number.isFinite(changePct)) return current;
-  const factor = 1 + changePct / 100;
-  if (factor <= 0) return current;
-  return current / factor;
-}
-
 type TraderLink = { label: string; url: string };
 
 function buildTraderLinks(mint: string, pairUrl: string | null): TraderLink[] {
@@ -96,7 +88,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const [voteDirection, setVoteDirection] = useState<"up" | "down" | null>(null);
   const [showVoters, setShowVoters] = useState(false);
   const [recentVoters, setRecentVoters] = useState<string[]>([]);
-  const [chartSource, setChartSource] = useState<"native" | "gmgn">("native");
+  const [chartSource, setChartSource] = useState<"native" | "gmgn">("gmgn");
   const [error, setError] = useState<string | null>(null);
   const sampleMints = [
     "So11111111111111111111111111111111111111112",
@@ -212,23 +204,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 volume: Number(c.v),
               }))
               .sort((a, b) => a.t - b.t);
-            const nowSec = Math.floor(Date.now() / 1000);
-            const inferredBase =
-              data.market.priceUsd ??
-              backsolvePrice(1, data.market.priceChange.h1) ??
-              backsolvePrice(1, data.market.priceChange.h24) ??
-              1;
-            const pNow = Number.isFinite(inferredBase) && inferredBase > 0 ? inferredBase : 1;
-            const p5m = backsolvePrice(pNow, data.market.priceChange.m5);
-            const p1h = backsolvePrice(pNow, data.market.priceChange.h1);
-            const p24h = backsolvePrice(pNow, data.market.priceChange.h24);
-            const syntheticPoints = [
-              { t: nowSec - 24 * 3600, close: p24h ?? pNow, open: p24h ?? pNow, high: p24h ?? pNow, low: p24h ?? pNow, volume: 0 },
-              { t: nowSec - 3600, close: p1h ?? pNow, open: p1h ?? pNow, high: p1h ?? pNow, low: p1h ?? pNow, volume: 0 },
-              { t: nowSec - 300, close: p5m ?? pNow, open: p5m ?? pNow, high: p5m ?? pNow, low: p5m ?? pNow, volume: 0 },
-              { t: nowSec, close: pNow, open: pNow, high: pNow, low: pNow, volume: 0 },
-            ].sort((a, b) => a.t - b.t);
-            const chartSeries = nativePoints.length > 1 ? nativePoints : syntheticPoints;
+            const chartSeries = nativePoints;
             const gmgnSrc = `https://www.gmgn.cc/kline/sol/${data.mint}?interval=${encodeURIComponent(
               gmgnInterval(interval),
             )}&theme=dark`;
@@ -355,7 +331,10 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               <div>Liq <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.liquidityUsd)}</span></div>
               <div>Vol <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.volume24hUsd)}</span></div>
             </div>
-            <div className="h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
+            <div className="relative h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
+              <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-[11px] text-white/75">
+                {data.identity.symbol || "TOKEN"} • {fmtUsd(data.market.priceUsd)} • 5m {fmtPct(data.market.priceChange.m5)} • 1h {fmtPct(data.market.priceChange.h1)} • 24h {fmtPct(data.market.priceChange.h24)}
+              </div>
               {chartSource === "gmgn" && (
                 <iframe
                   key={`${data.mint}:${interval}`}
@@ -419,7 +398,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               {chartSource === "native" && chartSeries.length <= 1 && (
                 <div className="grid h-full place-items-center px-6 text-center text-sm text-white/60">
                   <div>
-                    Native chart data is limited for this token/interval right now.
+                    Native OHLC data is unavailable for this token/interval.
                     <div className="mt-2">
                       <Button
                         size="sm"
@@ -436,7 +415,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
             </div>
             {chartSource === "native" && nativePoints.length <= 1 && (
               <div className="mt-2 text-xs text-white/50">
-                Native OHLC API has little/no data for this pair currently. A synthetic trend is shown from market change values.
+                No synthetic fallback is shown to avoid misleading trend shapes. Use GMGN for charting when OHLC is sparse.
               </div>
             )}
           </section>

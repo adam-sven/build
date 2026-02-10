@@ -113,6 +113,7 @@ export type TokenRowSummary = {
   name: string | null;
   symbol: string | null;
   image: string | null;
+  priceUsd: number | null;
   marketCapUsd: number | null;
   fdvUsd: number | null;
   liquidityUsd: number | null;

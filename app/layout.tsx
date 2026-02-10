@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import TrencherNav from '@/components/trencher-nav'
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
+import "@solana/wallet-adapter-react-ui/styles.css";
 
 import './globals.css'
 
@@ -27,10 +28,10 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <SolanaWalletProvider>
           <TrencherNav />
-          <div className="min-h-[calc(100vh-56px)] bg-[radial-gradient(1200px_600px_at_10%_-20%,#0d1f34_0%,transparent_55%),radial-gradient(900px_500px_at_90%_-10%,#06251c_0%,transparent_55%),#04060a] text-white">
+          <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-20%,#0d1f34_0%,transparent_55%),radial-gradient(900px_500px_at_90%_-10%,#06251c_0%,transparent_55%),#04060a] text-white md:pl-56">
             {children}
           </div>
-          <footer className="border-t border-white/10 bg-black/70 px-4 py-4 text-xs text-white/60">
+          <footer className="border-t border-white/10 bg-black/70 px-4 py-4 text-xs text-white/60 md:pl-60">
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
               <p>Trencher is a filter for attention, not a predictor. Not financial advice.</p>
               <p>

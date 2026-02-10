@@ -186,6 +186,7 @@ function toRow(token: TokenResponse, final: number): TokenRowSummary {
     name: token.identity.name,
     symbol: token.identity.symbol,
     image: token.identity.image,
+    priceUsd: token.market.priceUsd,
     marketCapUsd: token.market.marketCapUsd,
     fdvUsd: token.market.fdvUsd,
     liquidityUsd: token.market.liquidityUsd,
