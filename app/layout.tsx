@@ -33,6 +33,9 @@ export default function RootLayout({
             <ConnectButton />
           </div>
           <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-20%,#0d1f34_0%,transparent_55%),radial-gradient(900px_500px_at_90%_-10%,#06251c_0%,transparent_55%),#04060a] text-white md:pl-56">
+            <div className="border-b border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-center text-xs font-medium text-emerald-200 md:px-6">
+              Ranking is driven by community votes, search interest, and market quality - not payments.
+            </div>
             {children}
           </div>
           <footer className="border-t border-white/10 bg-black/70 px-4 py-4 text-xs text-white/60 md:pl-60">
