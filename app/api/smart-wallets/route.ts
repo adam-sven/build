@@ -196,6 +196,12 @@ function getSnapshotFingerprint(data: any): string {
   return `${ts}:${top.map((m: any) => m?.mint || "").join(",")}`;
 }
 
+function snapshotRows(data: any): number {
+  const w = Array.isArray(data?.topWallets) ? data.topWallets.length : 0;
+  const m = Array.isArray(data?.topMints) ? data.topMints.length : 0;
+  return w + m;
+}
+
 export async function GET(request: NextRequest) {
   const ip = getIp(request);
   if (!isAllowed(ip)) {
@@ -220,8 +226,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    let cachedWebhook: any | null = null;
     if (webhookMode) {
-      const cachedWebhook = await getStoredSmartSnapshotFromEvents();
+      cachedWebhook = await getStoredSmartSnapshotFromEvents();
       if (cachedWebhook) {
         const hasPnl = Array.isArray((cachedWebhook as any)?.activity)
           && (cachedWebhook as any).activity.some((a: any) => Array.isArray(a?.positions));
@@ -233,7 +240,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { data, stale, source } = await getSmartWalletSnapshot();
+    const { data: polled, stale, source } = await getSmartWalletSnapshot();
+    const webhookRows = snapshotRows(cachedWebhook);
+    const polledRows = snapshotRows(polled);
+    const webhookTs = cachedWebhook?.timestamp ? new Date(cachedWebhook.timestamp).getTime() : 0;
+    const polledTs = polled?.timestamp ? new Date(polled.timestamp).getTime() : 0;
+    const useWebhook = webhookRows > 0 && (polledRows === 0 || webhookTs >= polledTs);
+    const data = useWebhook ? cachedWebhook : polled;
+    const effectiveSource = useWebhook ? "webhook" : source;
+
     const fp = getSnapshotFingerprint(data);
     const now = Date.now();
     if (
@@ -245,7 +260,7 @@ export async function GET(request: NextRequest) {
         headers: {
           "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
           "X-Smart-Stale": stale ? "1" : "0",
-          "X-Smart-Source": source,
+          "X-Smart-Source": effectiveSource,
           "X-Smart-Hydrate": "cache",
         },
       });
@@ -257,7 +272,7 @@ export async function GET(request: NextRequest) {
       headers: {
         "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
         "X-Smart-Stale": stale ? "1" : "0",
-        "X-Smart-Source": source,
+        "X-Smart-Source": effectiveSource,
         "X-Smart-Hydrate": "fresh",
       },
     });
