@@ -414,14 +414,18 @@ export default function SmartWalletsPage() {
         </div>
 
         {data?.stats && (
-          <div className="mb-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="mb-5 grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wider text-white/45">Wallets</div>
+              <div className="text-[11px] uppercase tracking-wider text-white/45">Tracked wallets</div>
               <div className="text-lg font-semibold">{data.stats.totalWallets}</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wider text-white/45">Active</div>
+              <div className="text-[11px] uppercase tracking-wider text-white/45">Active (24h)</div>
               <div className="text-lg font-semibold">{data.stats.activeWallets}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+              <div className="text-[11px] uppercase tracking-wider text-white/45">Shown in list</div>
+              <div className="text-lg font-semibold">{wallets.length}</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wider text-white/45">Buys Seen</div>
@@ -455,7 +459,9 @@ export default function SmartWalletsPage() {
                   className="w-40 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs text-white/80 placeholder:text-white/40 focus:outline-none focus:border-white/30"
                 />
               </div>
-              <p className="mt-1 text-xs text-white/50">PnL shows realized + unrealized SOL estimate from sampled trades and live token prices.</p>
+              <p className="mt-1 text-xs text-white/50">
+                Showing wallets with buys + profile identity (name/social). PnL is rolling 24h realized + unrealized SOL estimate.
+              </p>
             </div>
 
             <div className="max-h-[62vh] overflow-y-auto">
