@@ -142,7 +142,8 @@ const TOKEN_METADATA_CONCURRENCY = Number(
 );
 const TOKEN_META_TTL = 10 * 60 * 1000;
 const SNAPSHOT_FALLBACK_WINDOW_MS = Number(process.env.SMART_SNAPSHOT_FALLBACK_WINDOW_MS || `${6 * 60 * 60 * 1000}`);
-const RECENT_BUY_WINDOW_SEC = Number(process.env.SMART_RECENT_BUY_WINDOW_SEC || `${6 * 60 * 60}`);
+const PNL_WINDOW_SEC = Number(process.env.SMART_PNL_WINDOW_SEC || `${24 * 60 * 60}`);
+const RECENT_BUY_WINDOW_SEC = Number(process.env.SMART_RECENT_BUY_WINDOW_SEC || `${PNL_WINDOW_SEC}`);
 const MIN_KEEP_LIQ_USD = Number(process.env.SMART_MIN_KEEP_LIQ_USD || "2500");
 const MIN_KEEP_VOL_USD = Number(process.env.SMART_MIN_KEEP_VOL_USD || "5000");
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
@@ -395,6 +396,8 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
   let txCount = 0;
   let lastSeen: number | null = null;
   const positions = new Map<string, PositionState>();
+  const nowSec = Math.floor(Date.now() / 1000);
+  const cutoffSec = nowSec - PNL_WINDOW_SEC;
 
   for (const sig of signatures) {
     let tx: any = null;
@@ -411,6 +414,7 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
 
     txCount += 1;
     const blockTime = tx.blockTime ?? sig.blockTime ?? null;
+    if (blockTime && blockTime < cutoffSec) continue;
     if (blockTime && (!lastSeen || blockTime > lastSeen)) {
       lastSeen = blockTime;
     }
