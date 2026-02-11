@@ -69,11 +69,7 @@ export async function POST(req: NextRequest) {
       preflightCommitment: "confirmed",
       maxRetries: 3,
     });
-    const latest = await conn.getLatestBlockhash("confirmed");
-    await conn.confirmTransaction(
-      { signature: sig, ...latest },
-      "confirmed",
-    );
+    await conn.confirmTransaction(sig, "confirmed");
     return ok({ ok: true, signature: sig });
   } catch (e: any) {
     return err("rpc_error", e?.message || "Failed to broadcast transaction", 502);
