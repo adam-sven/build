@@ -233,16 +233,18 @@ export default function DiscoverClient() {
             <div className="col-span-4">
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
-                <div>
+                <div className="min-w-0">
                   <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
                     <span className="grid h-7 w-7 place-items-center rounded-md bg-black/20">
                       <SourceIcon source={item.source as SourceFilter} className="h-7 w-7" />
                     </span>
-                    <span>{item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span></span>
+                    <span className="truncate">
+                      {item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span>
+                    </span>
                   </Link>
                   <button
                     type="button"
-                    className="text-xs text-white/45 hover:text-emerald-300"
+                    className="mt-0.5 block text-left font-mono text-xs text-white/45 hover:text-emerald-300"
                     onClick={() => copyMint(item.mint)}
                     title="Copy contract address"
                   >
@@ -275,16 +277,16 @@ export default function DiscoverClient() {
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
-                <div>
+                <div className="min-w-0">
                 <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
                   <span className="grid h-7 w-7 place-items-center rounded-md bg-black/40">
                     <SourceIcon source={item.source as SourceFilter} className="h-6 w-6" />
                   </span>
-                  <span>{item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}</span>
+                  <span className="truncate">{item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}</span>
                 </Link>
                 <button
                   type="button"
-                  className="text-xs text-white/45 hover:text-emerald-300"
+                  className="mt-0.5 block text-left font-mono text-xs text-white/45 hover:text-emerald-300"
                   onClick={() => copyMint(item.mint)}
                   title="Copy contract address"
                 >
