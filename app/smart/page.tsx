@@ -296,9 +296,7 @@ export default function SmartWalletsPage() {
   }, [data]);
 
   const wallets = useMemo(() => {
-    const list = (data?.topWallets || [])
-      .filter((item) => item.buyCount > 0)
-      .filter((item) => Boolean(item.profile?.name || item.profile?.twitter || item.profile?.telegram || item.profile?.website));
+    const list = (data?.topWallets || []);
     if (!walletFilter.trim()) return list;
     const q = walletFilter.toLowerCase();
     return list.filter((item) => {
@@ -460,7 +458,7 @@ export default function SmartWalletsPage() {
                 />
               </div>
               <p className="mt-1 text-xs text-white/50">
-                Showing wallets with buys + profile identity (name/social). PnL is rolling 24h realized + unrealized SOL estimate.
+                Showing all tracked wallets. PnL is rolling 24h realized + unrealized SOL estimate.
               </p>
             </div>
 
@@ -507,6 +505,7 @@ export default function SmartWalletsPage() {
                           </div>
                           <div className="mt-1 text-xs text-white/50">
                             {shortAddr(wallet.wallet, 7, 7)} • Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
+                            {wallet.buyCount === 0 ? <span className="ml-2 text-white/40">• Inactive (24h)</span> : null}
                           </div>
                         </div>
                         <div className={`text-sm font-semibold ${(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>

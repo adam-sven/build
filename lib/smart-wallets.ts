@@ -966,7 +966,6 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   enrichWalletPnL(mergedActivity, mintMetaMap, solPriceUsd);
 
   const topWallets: TopWallet[] = mergedActivity
-    .filter((item) => item.buys.length > 0 || Math.abs(item.totalPnlSol) > 1e-9)
     .map((item) => ({
       wallet: item.wallet,
       buyCount: item.buys.length,
