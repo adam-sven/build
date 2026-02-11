@@ -17,6 +17,7 @@ type WalletProfile = {
   } | null;
   updatedAt: string;
   summary: {
+    solBalance: number | null;
     sampledPnlSol: number;
     realizedPnlSol: number;
     unrealizedPnlSol: number;
@@ -110,6 +111,11 @@ function sol(v: number) {
   return `${sign}${v.toFixed(2)} SOL`;
 }
 
+function solAmount(v: number | null) {
+  if (v === null) return "-";
+  return `${v.toFixed(3)} SOL`;
+}
+
 function formatTime(sec: number | null) {
   if (!sec) return "-";
   return new Date(sec * 1000).toLocaleString();
@@ -186,6 +192,7 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
             <Stat title="Win Rate" value={formatWinRate(data.summary.winRate)} />
           </div>
           <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat title="SOL Balance" value={solAmount(data.summary.solBalance)} />
             <Stat title="Unique tokens" value={String(data.summary.uniqueMints)} />
             <Stat title="Transactions" value={String(data.summary.txCount)} />
             <Stat title="Closed trades" value={String(data.summary.closedTrades)} />

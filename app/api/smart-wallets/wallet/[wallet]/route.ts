@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSmartWalletSnapshot } from "@/lib/smart-wallets";
 import { getStoredSmartSnapshotFromEvents } from "@/lib/trencher/helius-ingest";
+import { getSolBalance } from "@/lib/trencher/helius";
 import { normalizeImageUrl } from "@/lib/utils";
 import { getWalletProfile } from "@/lib/wallet-profiles";
 
@@ -55,11 +56,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     return NextResponse.json({ ok: false, error: "invalid_wallet" }, { status: 400 });
   }
 
-  const [{ data: baseSnapshot }, webhookSnapshot] = await Promise.all([
+  const [{ data: baseSnapshot }, webhookSnapshot, solBalance] = await Promise.all([
     getSmartWalletSnapshot(),
     process.env.SMART_USE_WEBHOOK_EVENTS !== "false"
       ? getStoredSmartSnapshotFromEvents()
       : Promise.resolve(null),
+    getSolBalance(wallet),
   ]);
 
   const getWalletActivity = (snapshot: any) =>
@@ -186,6 +188,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
       : null,
     updatedAt: data.timestamp,
     summary: {
+      solBalance: typeof solBalance === "number" ? solBalance : null,
       sampledPnlSol: activity.sampledPnlSol,
       realizedPnlSol: activityAny.realizedPnlSol || 0,
       unrealizedPnlSol: activityAny.unrealizedPnlSol || 0,
