@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kvGet } from "@/lib/trencher/kv";
+import Redis from "ioredis";
 
 const SMART_SNAPSHOT_KEY = "trencher:smart-wallets:snapshot:v1";
 const LIVE_SMART_AT_KEY = "trencher:live:smart:at";
@@ -56,6 +57,47 @@ export async function GET(request: NextRequest) {
   const topMints = Array.isArray(smartSnapshot?.topMints) ? smartSnapshot.topMints.length : 0;
   const activity = Array.isArray(smartSnapshot?.activity) ? smartSnapshot.activity.length : 0;
 
+  let redisHealth: {
+    reachable: boolean;
+    ping: string | null;
+    snapshotKeyExists: boolean | null;
+    error: string | null;
+  } = {
+    reachable: false,
+    ping: null,
+    snapshotKeyExists: null,
+    error: null,
+  };
+
+  const redisUrl = process.env.REDIS_URL || "";
+  if (redisUrl) {
+    const client = new Redis(redisUrl, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+      tls: redisUrl.startsWith("rediss://") ? {} : undefined,
+    });
+    try {
+      await client.connect();
+      const [ping, exists] = await Promise.all([client.ping(), client.exists(SMART_SNAPSHOT_KEY)]);
+      redisHealth = {
+        reachable: true,
+        ping: ping || null,
+        snapshotKeyExists: exists === 1,
+        error: null,
+      };
+    } catch (error: any) {
+      redisHealth = {
+        reachable: false,
+        ping: null,
+        snapshotKeyExists: null,
+        error: error?.message || "redis check failed",
+      };
+    } finally {
+      await client.quit().catch(() => undefined);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     now: new Date().toISOString(),
@@ -63,6 +105,7 @@ export async function GET(request: NextRequest) {
       redisConfigured: Boolean(process.env.REDIS_URL),
       vercelKvConfigured: Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
       heliusConfigured: Boolean(process.env.HELIUS_API_KEY),
+      redisHealth,
     },
     liveRefresh: {
       smartAt: liveSmartAt || 0,
@@ -95,4 +138,3 @@ export async function GET(request: NextRequest) {
     },
   });
 }
-
