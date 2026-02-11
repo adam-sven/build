@@ -19,7 +19,7 @@ export default function ApiDocsPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8">
+    <main className="w-full px-3 py-8 md:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">API Docs</h1>
       <p className="mt-1 text-sm text-white/60">Agent-ready endpoints and schemas.</p>
 

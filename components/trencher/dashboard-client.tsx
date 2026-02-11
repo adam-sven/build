@@ -287,7 +287,7 @@ export default function DashboardClient() {
   }, [intel]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8">
+    <main className="w-full px-3 py-8 md:px-6">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>

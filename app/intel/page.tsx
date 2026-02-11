@@ -9,7 +9,7 @@ export default async function IntelPage({
   const mint = params?.mint || "";
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8">
+    <main className="w-full px-3 py-8 md:px-6">
       <IntelClient initialMint={mint} />
     </main>
   );

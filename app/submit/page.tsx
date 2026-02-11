@@ -7,7 +7,7 @@ function fmtSol(lamports: number) {
 
 export default function SubmitPage() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8">
+    <main className="w-full px-3 py-8 md:px-6">
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="space-y-6">
           <div>

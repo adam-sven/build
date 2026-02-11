@@ -372,7 +372,7 @@ export default function SmartWalletsPage() {
 
   return (
     <main className="min-h-screen text-foreground bg-[radial-gradient(1200px_500px_at_10%_-10%,#14213d_0%,transparent_60%),radial-gradient(900px_400px_at_90%_10%,#1f2937_0%,transparent_55%),#05070b]">
-      <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
+      <div className="w-full px-3 py-8 md:px-6 md:py-12">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Smart Wallets</h1>

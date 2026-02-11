@@ -24,7 +24,7 @@ export default function TrencherGlobalSearch() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2 md:px-6">
+    <div className="flex w-full items-center gap-2 px-3 py-2 md:px-6">
       <div className="relative w-full md:max-w-2xl">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/45" />
         <input

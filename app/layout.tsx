@@ -36,7 +36,7 @@ export default function RootLayout({
               Ranking is driven by community votes, search interest, and market quality - not payments.
             </div>
             <div className="border-b border-white/10 bg-black/25">
-              <div className="mx-auto hidden w-full max-w-7xl justify-end px-4 pt-2 md:flex md:px-6">
+              <div className="hidden w-full justify-end px-3 pt-2 md:flex md:px-6">
                 <ConnectButton />
               </div>
               <TrencherGlobalSearch />
@@ -44,8 +44,8 @@ export default function RootLayout({
             {children}
           </div>
           <LiveStatusBadge />
-          <footer className="border-t border-white/10 bg-black/70 px-4 py-4 text-xs text-white/60 md:pl-60">
-            <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
+          <footer className="border-t border-white/10 bg-black/70 px-3 py-4 text-xs text-white/60 md:pl-60 md:pr-6">
+            <div className="flex w-full flex-col gap-2">
               <p>Trencher is a filter for attention, not a predictor. Not financial advice.</p>
               <p>
                 Voting requires 0.001 SOL anti-spam fee to public treasury.{" "}

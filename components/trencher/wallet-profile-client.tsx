@@ -147,7 +147,7 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
   const topTokens = useMemo(() => (data?.tokens || []).slice(0, 25), [data]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8">
+    <main className="w-full px-3 py-8 md:px-6">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href="/smart" className="text-xs text-cyan-300 hover:text-cyan-200">← Back to Smart Wallets</Link>
