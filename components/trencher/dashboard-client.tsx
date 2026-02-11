@@ -41,6 +41,24 @@ type SmartWalletSnapshot = {
   }>;
 };
 
+type PumpfunTrendingResponse = {
+  ok: boolean;
+  generatedAt?: string;
+  items: Array<{
+    mint: string;
+    name: string | null;
+    symbol: string | null;
+    image: string | null;
+    priceUsd: number | null;
+    marketCapUsd: number | null;
+    volume24hUsd: number | null;
+    liquidityUsd: number | null;
+    change24h: number | null;
+    pairUrl: string | null;
+    bonded: boolean;
+  }>;
+};
+
 type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
 const SOURCE_META: Record<Exclude<SourceFilter, "all">, { label: string; icon: string }> = {
   pumpfun: { label: "Pumpfun", icon: "/source-pumpfun.svg" },
@@ -82,6 +100,7 @@ function SourceIcon({ source }: { source: "pumpfun" | "bagsapp" | "other" }) {
 export default function DashboardClient() {
   const [discover, setDiscover] = useState<DiscoverResponse | null>(null);
   const [smart, setSmart] = useState<SmartWalletSnapshot | null>(null);
+  const [pump, setPump] = useState<PumpfunTrendingResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [mintInput, setMintInput] = useState("");
@@ -102,33 +121,38 @@ export default function DashboardClient() {
   }
 
   const loadDashboard = async (silent = false) => {
-    const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null }>(sessionKey);
-    if (!silent && !cached?.discover && !cached?.smart) setLoading(true);
+    const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null; pump: PumpfunTrendingResponse | null }>(sessionKey);
+    if (!silent && !cached?.discover && !cached?.smart && !cached?.pump) setLoading(true);
     if (!silent && cached) {
       if (cached.discover?.ok) setDiscover(cached.discover);
       if (cached.smart?.ok) setSmart(cached.smart);
+      if (cached.pump?.ok) setPump(cached.pump);
     }
     try {
-      const [discoverRes, smartRes] = await Promise.allSettled([
+      const [discoverRes, smartRes, pumpRes] = await Promise.allSettled([
         fetchJsonWithTimeout("/api/ui/discover?chain=solana&mode=trending", silent ? 8_000 : 20_000),
         fetchJsonWithTimeout("/api/smart-wallets", silent ? 8_000 : 20_000),
+        fetchJsonWithTimeout("/api/ui/pumpfun/trending", silent ? 8_000 : 20_000),
       ]);
       const discoverJson = discoverRes.status === "fulfilled" ? discoverRes.value : null;
       const smartJson = smartRes.status === "fulfilled" ? smartRes.value : null;
+      const pumpJson = pumpRes.status === "fulfilled" ? pumpRes.value : null;
 
       const nextDiscover = discoverJson?.ok ? discoverJson : cached?.discover || null;
       const nextSmart = smartJson?.ok ? smartJson : cached?.smart || null;
+      const nextPump = pumpJson?.ok ? pumpJson : cached?.pump || null;
 
       if (nextDiscover?.ok) setDiscover(nextDiscover);
       if (nextSmart?.ok) setSmart(nextSmart);
+      if (nextPump?.ok) setPump(nextPump);
 
-      if (discoverJson?.ok || smartJson?.ok) {
+      if (discoverJson?.ok || smartJson?.ok || pumpJson?.ok) {
         setError(null);
       } else if (!silent) {
         setError("Dashboard data timeout. Retry in a few seconds.");
       }
 
-      writeSessionJson(sessionKey, { discover: nextDiscover, smart: nextSmart });
+      writeSessionJson(sessionKey, { discover: nextDiscover, smart: nextSmart, pump: nextPump });
     } catch {
       if (!silent) setError("Failed to load dashboard data.");
     } finally {
@@ -149,9 +173,10 @@ export default function DashboardClient() {
   };
 
   useEffect(() => {
-    const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null }>(sessionKey);
+    const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null; pump: PumpfunTrendingResponse | null }>(sessionKey);
     if (cached?.discover?.ok) setDiscover(cached.discover);
     if (cached?.smart?.ok) setSmart(cached.smart);
+    if (cached?.pump?.ok) setPump(cached.pump);
     loadDashboard();
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
@@ -168,6 +193,7 @@ export default function DashboardClient() {
         .slice(0, 5),
     [smart],
   );
+  const pumpTokens = useMemo(() => (pump?.items || []).slice(0, 5), [pump]);
 
   const miniChart = useMemo(() => {
     if (!intel) return [];
@@ -327,6 +353,41 @@ export default function DashboardClient() {
               </Link>
             </div>
           )}
+        </section>
+
+        <section className="xl:col-span-12 rounded-2xl border border-white/10 bg-black/30 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">Pump.fun Trending</h2>
+            <div className="text-xs text-white/55">Profiles + market data (bonded if pair exists)</div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-5">
+            {pumpTokens.map((item, idx) => (
+              <Link
+                key={item.mint}
+                href={`/intel?mint=${item.mint}`}
+                className="rounded-lg border border-white/10 bg-black/25 p-2 hover:border-emerald-300/35"
+              >
+                <div className="flex items-center gap-2">
+                  <TokenAvatar image={item.image} symbol={item.symbol} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">#{idx + 1} {item.symbol || short(item.mint, 4, 4)}</div>
+                    <div className="truncate text-xs text-white/55">{item.name || short(item.mint)}</div>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/70">
+                  <div>MC {usd(item.marketCapUsd)}</div>
+                  <div>Vol {usd(item.volume24hUsd)}</div>
+                </div>
+                <div className="mt-1 text-xs">
+                  <span className={item.change24h !== null && item.change24h >= 0 ? "text-emerald-300" : "text-red-300"}>
+                    {pct(item.change24h)}
+                  </span>
+                  <span className="ml-2 text-white/50">{item.bonded ? "Bonded" : "Pre-bonded"}</span>
+                </div>
+              </Link>
+            ))}
+            {!loading && pumpTokens.length === 0 && <p className="text-sm text-white/60">No Pump.fun profiles available right now.</p>}
+          </div>
         </section>
       </div>
     </main>

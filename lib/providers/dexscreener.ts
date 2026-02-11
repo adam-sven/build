@@ -148,39 +148,75 @@ export class DexscreenerMarketProvider {
   }
 
   async getCandles(chain: Chain, mint: string, interval: Interval): Promise<Candle[]> {
-    const pair = await this.getPrimaryPair(chain, mint);
-    const pool = pair?.pairAddress;
-    if (!pool) return [];
-
+    if (chain !== "solana") return [];
     const geckoCfg = intervalToGecko(interval);
-    const url = `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/${geckoCfg.timeframe}?aggregate=${geckoCfg.aggregate}&limit=${geckoCfg.limit}`;
+    const pair = await this.getPrimaryPair(chain, mint);
+
+    const poolCandidates = new Set<string>();
+    if (typeof pair?.pairAddress === "string" && pair.pairAddress.length > 20) {
+      poolCandidates.add(pair.pairAddress);
+    }
 
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
+      const poolsRes = await fetch(
+        `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${mint}/pools?page=1`,
+        {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        },
+      );
       clearTimeout(timeout);
-      if (!res.ok) return [];
-      const json = await res.json();
-      const list = json?.data?.attributes?.ohlcv_list;
-      if (!Array.isArray(list)) return [];
-      return list
-        .map((row: any) => ({
-          // Keep UNIX time in seconds (all app charts normalize from seconds).
-          t: Number(row[0]),
-          o: Number(row[1]),
-          h: Number(row[2]),
-          l: Number(row[3]),
-          c: Number(row[4]),
-          v: Number(row[5] || 0),
-        }))
-        .filter((x: Candle) => Number.isFinite(x.t) && Number.isFinite(x.c));
+      if (poolsRes.ok) {
+        const poolsJson = await poolsRes.json();
+        const pools = Array.isArray(poolsJson?.data) ? poolsJson.data : [];
+        for (const p of pools) {
+          const id = String(p?.id || "");
+          const maybePool = id.includes("_") ? id.split("_").slice(1).join("_") : id;
+          if (maybePool.length > 20) poolCandidates.add(maybePool);
+        }
+      }
     } catch {
-      return [];
+      // ignore, we'll still try pairAddress candidate
     }
+
+    const fetchOhlcv = async (pool: string): Promise<Candle[]> => {
+      const url = `https://api.geckoterminal.com/api/v2/networks/solana/pools/${pool}/ohlcv/${geckoCfg.timeframe}?aggregate=${geckoCfg.aggregate}&limit=${geckoCfg.limit}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        if (!res.ok) return [];
+        const json = await res.json();
+        const list = json?.data?.attributes?.ohlcv_list;
+        if (!Array.isArray(list)) return [];
+        return list
+          .map((row: any) => ({
+            t: Number(row[0]),
+            o: Number(row[1]),
+            h: Number(row[2]),
+            l: Number(row[3]),
+            c: Number(row[4]),
+            v: Number(row[5] || 0),
+          }))
+          .filter((x: Candle) => Number.isFinite(x.t) && Number.isFinite(x.c));
+      } catch {
+        return [];
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
+    for (const pool of poolCandidates) {
+      const out = await fetchOhlcv(pool);
+      if (out.length > 1) return out;
+    }
+    return [];
   }
 }

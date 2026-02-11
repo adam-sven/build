@@ -109,13 +109,14 @@ async function hydrateTopMintMeta(data: any) {
   for (const row of missing) {
     const mint = String(row?.mint || "");
     if (!MINT_RE.test(mint)) continue;
+    const cdnFallback = `https://cdn.dexscreener.com/tokens/solana/${mint}.png`;
     const pair = dexMap.get(mint);
     if (pair) {
       row.token = {
         ...row.token,
         name: row.token?.name || pair?.baseToken?.name || null,
         symbol: row.token?.symbol || pair?.baseToken?.symbol || null,
-        image: normalizeImageUrl(row.token?.image || pair?.info?.imageUrl || null),
+        image: normalizeImageUrl(row.token?.image || pair?.info?.imageUrl || cdnFallback),
         priceUsd: row.token?.priceUsd ?? (pair?.priceUsd ? Number(pair.priceUsd) : null),
         change24h: row.token?.change24h ?? pair?.priceChange?.h24 ?? null,
         volume24h: row.token?.volume24h ?? pair?.volume?.h24 ?? null,
@@ -134,7 +135,7 @@ async function hydrateTopMintMeta(data: any) {
         ...row.token,
         name: row.token?.name || jup?.name || null,
         symbol: row.token?.symbol || jup?.symbol || null,
-        image: normalizeImageUrl(row.token?.image || jup?.logoURI || null),
+        image: normalizeImageUrl(row.token?.image || jup?.logoURI || cdnFallback),
       };
       continue;
     }
@@ -144,7 +145,7 @@ async function hydrateTopMintMeta(data: any) {
       ...row.token,
       name: row.token?.name || helius.name,
       symbol: row.token?.symbol || helius.symbol,
-      image: normalizeImageUrl(row.token?.image || helius.image),
+      image: normalizeImageUrl(row.token?.image || helius.image || cdnFallback),
     };
   }
 

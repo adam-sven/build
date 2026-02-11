@@ -121,11 +121,20 @@ const formatPct = (val: number | null) => {
   return `${sign}${val.toFixed(2)}%`;
 };
 
-function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
-  const [src, setSrc] = useState<string>(image || "/placeholder-logo.svg");
+function TokenAvatar({ image, symbol, mint }: { image: string | null; symbol: string | null; mint: string }) {
+  const candidates = [
+    image || "",
+    `https://cdn.dexscreener.com/tokens/solana/${mint}.png`,
+    `https://dd.dexscreener.com/ds-data/tokens/solana/${mint}.png`,
+    "/placeholder-logo.svg",
+  ].filter(Boolean);
+  const [idx, setIdx] = useState(0);
+  const src = candidates[Math.min(idx, candidates.length - 1)];
+
   useEffect(() => {
-    setSrc(image || "/placeholder-logo.svg");
-  }, [image]);
+    setIdx(0);
+  }, [image, mint]);
+
   if (src) {
     return (
       <img
@@ -134,7 +143,7 @@ function TokenAvatar({ image, symbol }: { image: string | null; symbol: string |
         className="h-6 w-6 rounded-full border border-white/15 object-cover"
         loading="lazy"
         referrerPolicy="no-referrer"
-        onError={() => setSrc("/placeholder-logo.svg")}
+        onError={() => setIdx((v) => Math.min(v + 1, candidates.length - 1))}
       />
     );
   }
@@ -422,7 +431,7 @@ export default function SmartWalletsPage() {
                         <div className="text-xs text-white/40">#{index + 1}</div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <TokenAvatar image={token.token.image} symbol={token.token.symbol} />
+                            <TokenAvatar image={token.token.image} symbol={token.token.symbol} mint={token.mint} />
                             <span className="font-semibold">
                               {token.token.symbol || shortAddr(token.mint, 4, 4)}
                             </span>
