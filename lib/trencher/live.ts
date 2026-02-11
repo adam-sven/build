@@ -14,6 +14,7 @@ const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
   quality: 60_000,
 };
 const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || (LOW_CREDIT_MODE ? "21600000" : "7200000"));
+const SMART_BOOTSTRAP_ON_COLD = process.env.SMART_BOOTSTRAP_ON_COLD !== "false";
 const LIVE_LOCK_KEY = "trencher:live:refresh:lock";
 
 const DISCOVER_AT_KEY = (chain: Chain, mode: DiscoverMode) => `trencher:live:discover:at:${chain}:${mode}`;
@@ -41,7 +42,9 @@ export async function runLiveRefresh(chain: Chain, scope: LiveScope = "all") {
         })
       : [];
   const needDiscover = discoverModesToRefresh.length > 0;
-  const needSmart = (scope === "all" || scope === "smart") && (!smartAt || now - smartAt > SMART_REFRESH_MS);
+  const bootstrapSmart = SMART_BOOTSTRAP_ON_COLD && !smartAt;
+  const needSmart =
+    bootstrapSmart || ((scope === "all" || scope === "smart") && (!smartAt || now - smartAt > SMART_REFRESH_MS));
 
   if (!needDiscover && !needSmart) {
     return { ok: true, refreshed: false, reason: "fresh", discoverAt, smartAt };
