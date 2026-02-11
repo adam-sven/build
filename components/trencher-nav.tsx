@@ -120,6 +120,22 @@ export default function TrencherNav() {
             >
               Trade FOMO
             </a>
+            <a
+              href="https://trade.padre.gg/rk/trencherdex"
+              target="_blank"
+              rel="noreferrer nofollow noopener"
+              className="block rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-200 hover:border-amber-300/60 hover:text-amber-100"
+            >
+              Trade Padre
+            </a>
+            <a
+              href="https://axiom.trade/@kingsven"
+              target="_blank"
+              rel="noreferrer nofollow noopener"
+              className="block rounded-lg border border-violet-400/40 bg-violet-400/10 px-3 py-2 text-xs text-violet-200 hover:border-violet-300/60 hover:text-violet-100"
+            >
+              Trade Axiom
+            </a>
           </div>
         </div>
       </aside>

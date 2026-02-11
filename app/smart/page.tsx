@@ -124,6 +124,7 @@ const formatPct = (val: number | null) => {
 export default function SmartWalletsPage() {
   const [data, setData] = useState<SmartWalletSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
   const [expandedMint, setExpandedMint] = useState<string | null>(null);
@@ -148,8 +149,9 @@ export default function SmartWalletsPage() {
       if (!silent && !hasCachedRows) setLoading(true);
       try {
         const res = await fetch(`/api/smart-wallets${force ? '?force=1' : ''}`);
-        const json: SmartWalletSnapshot = await res.json();
+        const json = await res.json();
         if (!ignore && json?.ok) {
+          setError(null);
           setData((prev) => {
             const nextHasRows = hasSnapshotRows(json);
             const prevHasRows = hasSnapshotRows(prev);
@@ -157,6 +159,8 @@ export default function SmartWalletsPage() {
             writeSessionJson(sessionKey, next);
             return next;
           });
+        } else if (!ignore) {
+          setError(json?.error || "smart_wallets_failed");
         }
       } finally {
         if (!ignore && !silent) setLoading(false);
@@ -176,8 +180,9 @@ export default function SmartWalletsPage() {
     setRefreshing(true);
     try {
       const res = await fetch('/api/smart-wallets?force=1');
-      const json: SmartWalletSnapshot = await res.json();
+      const json = await res.json();
       if (json?.ok) {
+        setError(null);
         setData((prev) => {
           const nextHasRows = hasSnapshotRows(json);
           const prevHasRows = hasSnapshotRows(prev);
@@ -185,6 +190,8 @@ export default function SmartWalletsPage() {
           writeSessionJson(sessionKey, next);
           return next;
         });
+      } else {
+        setError(json?.error || "smart_wallets_failed");
       }
     } finally {
       setRefreshing(false);
@@ -270,6 +277,11 @@ export default function SmartWalletsPage() {
 
         {loading && (
           <div className="text-sm text-white/60">Loading smart wallet activity…</div>
+        )}
+        {!loading && error && (
+          <div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            Smart Wallets API error: {error}
+          </div>
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">

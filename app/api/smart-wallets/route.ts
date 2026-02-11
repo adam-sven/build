@@ -157,13 +157,6 @@ function getSnapshotFingerprint(data: any): string {
 }
 
 export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV === "production" && !process.env.HELIUS_API_KEY) {
-    return NextResponse.json(
-      { ok: false, error: "missing_helius_api_key" },
-      { status: 503 },
-    );
-  }
-
   const ip = getIp(request);
   if (!isAllowed(ip)) {
     return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });

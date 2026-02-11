@@ -108,18 +108,22 @@ const CACHE_TTL = Number(process.env.SMART_CACHE_TTL_MS || `${10 * 60 * 1000}`);
 let cache: { timestamp: number; data: SmartWalletSnapshot } | null = null;
 let refreshPromise: Promise<SmartWalletSnapshot> | null = null;
 
-const RAW_SIGNATURES_LIMIT = Number(process.env.SMART_SIGNATURES_LIMIT || "120");
-const RAW_MAX_TX_PER_WALLET = Number(process.env.SMART_MAX_TX_PER_WALLET || "80");
-const RAW_CONCURRENCY = Number(process.env.SMART_RPC_CONCURRENCY || "3");
-const SIGNATURES_LIMIT = Math.max(20, Math.min(400, Number.isFinite(RAW_SIGNATURES_LIMIT) ? Math.floor(RAW_SIGNATURES_LIMIT) : 120));
+const HAS_HELIUS = Boolean(process.env.HELIUS_API_KEY);
+const RAW_SIGNATURES_LIMIT = Number(process.env.SMART_SIGNATURES_LIMIT || (HAS_HELIUS ? "120" : "40"));
+const RAW_MAX_TX_PER_WALLET = Number(process.env.SMART_MAX_TX_PER_WALLET || (HAS_HELIUS ? "80" : "20"));
+const RAW_CONCURRENCY = Number(process.env.SMART_RPC_CONCURRENCY || (HAS_HELIUS ? "3" : "2"));
+const MAX_SIG_CAP = HAS_HELIUS ? 400 : 80;
+const MAX_TX_CAP = HAS_HELIUS ? 200 : 40;
+const CONCURRENCY_CAP = HAS_HELIUS ? 8 : 3;
+const SIGNATURES_LIMIT = Math.max(20, Math.min(MAX_SIG_CAP, Number.isFinite(RAW_SIGNATURES_LIMIT) ? Math.floor(RAW_SIGNATURES_LIMIT) : (HAS_HELIUS ? 120 : 40)));
 const MAX_TX_PER_WALLET = Math.max(
   10,
   Math.min(
-    SIGNATURES_LIMIT,
-    Number.isFinite(RAW_MAX_TX_PER_WALLET) ? Math.floor(RAW_MAX_TX_PER_WALLET) : 80,
+    Math.min(SIGNATURES_LIMIT, MAX_TX_CAP),
+    Number.isFinite(RAW_MAX_TX_PER_WALLET) ? Math.floor(RAW_MAX_TX_PER_WALLET) : (HAS_HELIUS ? 80 : 20),
   ),
 );
-const CONCURRENCY = Math.max(1, Math.min(8, Number.isFinite(RAW_CONCURRENCY) ? Math.floor(RAW_CONCURRENCY) : 3));
+const CONCURRENCY = Math.max(1, Math.min(CONCURRENCY_CAP, Number.isFinite(RAW_CONCURRENCY) ? Math.floor(RAW_CONCURRENCY) : (HAS_HELIUS ? 3 : 2)));
 const TOKEN_METADATA_LIMIT = 80;
 const TOKEN_METADATA_CONCURRENCY = 8;
 const TOKEN_META_TTL = 10 * 60 * 1000;
