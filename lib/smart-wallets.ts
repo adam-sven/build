@@ -1006,7 +1006,17 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
         pairUrl: null,
         dex: null,
       },
-    }));
+    }))
+    .sort((a, b) => {
+      const aChange = typeof a.token.change24h === "number" && Number.isFinite(a.token.change24h) ? a.token.change24h : null;
+      const bChange = typeof b.token.change24h === "number" && Number.isFinite(b.token.change24h) ? b.token.change24h : null;
+      if (aChange !== null && bChange !== null && bChange !== aChange) return bChange - aChange;
+      if (bChange !== null && aChange === null) return 1;
+      if (aChange !== null && bChange === null) return -1;
+      if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
+      if (b.walletCount !== a.walletCount) return b.walletCount - a.walletCount;
+      return (b.lastBuyAt || 0) - (a.lastBuyAt || 0);
+    });
 
   const activeWallets = mergedActivity.filter((item) => item.buys.length > 0).length;
   const totalBuys = mergedActivity.reduce((sum, item) => sum + item.buys.length, 0);

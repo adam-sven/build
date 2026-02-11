@@ -310,12 +310,19 @@ export default function SmartWalletsPage() {
     const list = [...(data?.topMints || [])]
       .filter((item) => isLikelyMint(String(item?.mint || "")))
       .sort((a, b) => {
-      const aKnown = (a.token?.name || a.token?.symbol || a.token?.image) ? 1 : 0;
-      const bKnown = (b.token?.name || b.token?.symbol || b.token?.image) ? 1 : 0;
-      if (bKnown !== aKnown) return bKnown - aKnown;
-      if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
-      return b.walletCount - a.walletCount;
-    });
+        const aChange = typeof a.token?.change24h === "number" && Number.isFinite(a.token.change24h)
+          ? a.token.change24h
+          : null;
+        const bChange = typeof b.token?.change24h === "number" && Number.isFinite(b.token.change24h)
+          ? b.token.change24h
+          : null;
+        if (aChange !== null && bChange !== null && bChange !== aChange) return bChange - aChange;
+        if (bChange !== null && aChange === null) return 1;
+        if (aChange !== null && bChange === null) return -1;
+        if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
+        if (b.walletCount !== a.walletCount) return b.walletCount - a.walletCount;
+        return (b.lastBuyAt || 0) - (a.lastBuyAt || 0);
+      });
     if (!mintFilter.trim()) return list;
     const q = mintFilter.toLowerCase();
     return list.filter((item) => {
