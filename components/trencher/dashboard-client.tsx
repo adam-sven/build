@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { DiscoverResponse, TokenResponse } from "@/lib/trencher/types";
+import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import {
   CartesianGrid,
   Line,
@@ -23,6 +24,7 @@ type SmartWalletSnapshot = {
     buyCount: number;
     sampledPnlSol: number;
     uniqueMints: number;
+    totalPnlSol?: number;
   }>;
   topMints: Array<{
     mint: string;
@@ -85,9 +87,15 @@ export default function DashboardClient() {
   const [mintInput, setMintInput] = useState("");
   const [intel, setIntel] = useState<TokenResponse | null>(null);
   const [intelLoading, setIntelLoading] = useState(false);
+  const sessionKey = "trencher:dashboard:v1";
 
   const loadDashboard = async (silent = false) => {
-    if (!silent) setLoading(true);
+    const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null }>(sessionKey);
+    if (!silent && !cached?.discover && !cached?.smart) setLoading(true);
+    if (!silent && cached) {
+      if (cached.discover?.ok) setDiscover(cached.discover);
+      if (cached.smart?.ok) setSmart(cached.smart);
+    }
     try {
       const [discoverRes, smartRes] = await Promise.all([
         fetch("/api/ui/discover?chain=solana&mode=trending"),
@@ -96,6 +104,10 @@ export default function DashboardClient() {
       const [discoverJson, smartJson] = await Promise.all([discoverRes.json(), smartRes.json()]);
       if (discoverJson?.ok) setDiscover(discoverJson);
       if (smartJson?.ok) setSmart(smartJson);
+      writeSessionJson(sessionKey, {
+        discover: discoverJson?.ok ? discoverJson : null,
+        smart: smartJson?.ok ? smartJson : null,
+      });
     } finally {
       if (!silent) setLoading(false);
     }
@@ -114,6 +126,9 @@ export default function DashboardClient() {
   };
 
   useEffect(() => {
+    const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null }>(sessionKey);
+    if (cached?.discover?.ok) setDiscover(cached.discover);
+    if (cached?.smart?.ok) setSmart(cached.smart);
     loadDashboard();
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
@@ -182,7 +197,8 @@ export default function DashboardClient() {
                   <div className={item.priceChange.h24 && item.priceChange.h24 > 0 ? "text-emerald-300" : "text-red-300"}>
                     {pct(item.priceChange.h24)}
                   </div>
-                  <div className="text-white/55">Vol {usd(item.volume24hUsd)}</div>
+                  <div className="text-white/55">MC {usd(item.marketCapUsd)}</div>
+                  <div className="text-white/45">Vol {usd(item.volume24hUsd)}</div>
                 </div>
               </Link>
             ))}
@@ -207,9 +223,9 @@ export default function DashboardClient() {
                   <div className="text-sm font-medium">#{idx + 1} {short(wallet.wallet)}</div>
                   <div className="text-xs text-white/55">Buys {wallet.buyCount} • Mints {wallet.uniqueMints}</div>
                 </div>
-                <div className={wallet.sampledPnlSol >= 0 ? "text-sm text-emerald-300" : "text-sm text-red-300"}>
-                  {wallet.sampledPnlSol > 0 ? "+" : ""}
-                  {wallet.sampledPnlSol.toFixed(2)} SOL
+                <div className={(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? "text-sm text-emerald-300" : "text-sm text-red-300"}>
+                  {(wallet.totalPnlSol ?? wallet.sampledPnlSol) > 0 ? "+" : ""}
+                  {(wallet.totalPnlSol ?? wallet.sampledPnlSol).toFixed(2)} SOL
                 </div>
               </Link>
             ))}

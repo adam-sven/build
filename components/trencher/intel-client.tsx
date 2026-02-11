@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import VoteModal from "@/components/trencher/vote-modal";
 import type { Interval, TokenResponse } from "@/lib/trencher/types";
+import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import {
   Area,
   AreaChart,
@@ -70,8 +71,9 @@ type TraderLink = { label: string; url: string };
 function buildTraderLinks(mint: string, pairUrl: string | null): TraderLink[] {
   const links: TraderLink[] = [
     { label: "GMGN", url: `https://gmgn.ai/sol/token/${mint}?ref=l6KmuuAJ` },
+    { label: "Padre", url: "https://trade.padre.gg/rk/trencherdex" },
     { label: "FOMO", url: `https://fomo.family/r/Adam_Sven_` },
-    { label: "Axiom", url: `https://axiom.trade/t/${mint}` },
+    { label: "Axiom", url: "https://axiom.trade/@kingsven" },
     { label: "Photon", url: `https://photon-sol.tinyastro.io/en/lp/${mint}` },
     { label: "BullX", url: `https://neo.bullx.io/terminal?chainId=1399811149&address=${mint}` },
   ];
@@ -98,6 +100,11 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
 
   const load = async (targetMint: string, targetInterval: Interval) => {
     if (!targetMint) return;
+    const sessionKey = `trencher:intel:${targetMint}:${targetInterval}:v1`;
+    const cached = readSessionJson<TokenResponse>(sessionKey);
+    if (cached?.ok) {
+      setData(cached);
+    }
     setLoading(true);
     setError(null);
     try {
@@ -105,6 +112,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
       const json = await res.json();
       if (json?.ok) {
         setData(json);
+        writeSessionJson(sessionKey, json);
         router.replace(`/intel?mint=${targetMint}`);
       } else {
         setData(null);
@@ -119,11 +127,19 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   };
 
   useEffect(() => {
-    if (mint) load(mint, interval);
+    if (mint) {
+      const cached = readSessionJson<TokenResponse>(`trencher:intel:${mint}:${interval}:v1`);
+      if (cached?.ok) setData(cached);
+      load(mint, interval);
+    }
   }, [interval]);
 
   useEffect(() => {
-    if (initialMint) load(initialMint, interval);
+    if (initialMint) {
+      const cached = readSessionJson<TokenResponse>(`trencher:intel:${initialMint}:${interval}:v1`);
+      if (cached?.ok) setData(cached);
+      load(initialMint, interval);
+    }
   }, [initialMint]);
 
   return (

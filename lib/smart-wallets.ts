@@ -20,6 +20,15 @@ export type WalletActivity = {
   lastSeen: number | null;
   uniqueMints: number;
   sampledPnlSol: number;
+  realizedPnlSol: number;
+  unrealizedPnlSol: number;
+  totalPnlSol: number;
+  costBasisSol: number;
+  currentValueSol: number;
+  closedTrades: number;
+  winningTrades: number;
+  winRate: number | null;
+  positions: WalletPosition[];
 };
 
 export type TopWallet = {
@@ -27,6 +36,11 @@ export type TopWallet = {
   buyCount: number;
   uniqueMints: number;
   sampledPnlSol: number;
+  realizedPnlSol: number;
+  unrealizedPnlSol: number;
+  totalPnlSol: number;
+  winRate: number | null;
+  closedTrades: number;
   txCount: number;
   lastSeen: number | null;
   topMints: string[];
@@ -71,13 +85,41 @@ export type SmartWalletSnapshot = {
   };
 };
 
+export type WalletPosition = {
+  mint: string;
+  qty: number;
+  costBasisSol: number;
+  realizedPnlSol: number;
+  unrealizedPnlSol: number;
+  totalPnlSol: number;
+  currentValueSol: number;
+  avgCostSol: number;
+  buyCount: number;
+  sellCount: number;
+  firstBuyAt: number | null;
+  lastTradeAt: number | null;
+  holdSeconds: number | null;
+  closedTrades: number;
+  winningTrades: number;
+  winRate: number | null;
+};
+
 const CACHE_TTL = Number(process.env.SMART_CACHE_TTL_MS || `${10 * 60 * 1000}`);
 let cache: { timestamp: number; data: SmartWalletSnapshot } | null = null;
 let refreshPromise: Promise<SmartWalletSnapshot> | null = null;
 
-const SIGNATURES_LIMIT = Number(process.env.SMART_SIGNATURES_LIMIT || "6");
-const MAX_TX_PER_WALLET = Number(process.env.SMART_MAX_TX_PER_WALLET || "4");
-const CONCURRENCY = Number(process.env.SMART_RPC_CONCURRENCY || "3");
+const RAW_SIGNATURES_LIMIT = Number(process.env.SMART_SIGNATURES_LIMIT || "120");
+const RAW_MAX_TX_PER_WALLET = Number(process.env.SMART_MAX_TX_PER_WALLET || "80");
+const RAW_CONCURRENCY = Number(process.env.SMART_RPC_CONCURRENCY || "3");
+const SIGNATURES_LIMIT = Math.max(20, Math.min(400, Number.isFinite(RAW_SIGNATURES_LIMIT) ? Math.floor(RAW_SIGNATURES_LIMIT) : 120));
+const MAX_TX_PER_WALLET = Math.max(
+  10,
+  Math.min(
+    SIGNATURES_LIMIT,
+    Number.isFinite(RAW_MAX_TX_PER_WALLET) ? Math.floor(RAW_MAX_TX_PER_WALLET) : 80,
+  ),
+);
+const CONCURRENCY = Math.max(1, Math.min(8, Number.isFinite(RAW_CONCURRENCY) ? Math.floor(RAW_CONCURRENCY) : 3));
 const TOKEN_METADATA_LIMIT = 80;
 const TOKEN_METADATA_CONCURRENCY = 8;
 const TOKEN_META_TTL = 10 * 60 * 1000;
@@ -179,6 +221,80 @@ function tokenUiAmount(balance: any): number {
   return Number.isFinite(fromString) ? fromString : 0;
 }
 
+function addMapAmount(map: Map<string, number>, mint: string, amount: number) {
+  map.set(mint, (map.get(mint) || 0) + amount);
+}
+
+function getTokenDeltaMap(tx: any, wallet: string): Map<string, number> {
+  const pre = (tx?.meta?.preTokenBalances || []).filter((b: any) => b.owner === wallet);
+  const post = (tx?.meta?.postTokenBalances || []).filter((b: any) => b.owner === wallet);
+
+  const preMap = new Map<string, number>();
+  for (const row of pre) {
+    const mint = String(row?.mint || "");
+    if (!mint || mint === WSOL_MINT) continue;
+    addMapAmount(preMap, mint, tokenUiAmount(row));
+  }
+
+  const postMap = new Map<string, number>();
+  for (const row of post) {
+    const mint = String(row?.mint || "");
+    if (!mint || mint === WSOL_MINT) continue;
+    addMapAmount(postMap, mint, tokenUiAmount(row));
+  }
+
+  const out = new Map<string, number>();
+  const keys = new Set<string>([...preMap.keys(), ...postMap.keys()]);
+  for (const mint of keys) {
+    const delta = (postMap.get(mint) || 0) - (preMap.get(mint) || 0);
+    if (Math.abs(delta) > 1e-12) out.set(mint, delta);
+  }
+  return out;
+}
+
+function allocByAmount(entries: Array<{ mint: string; amount: number }>, total: number): Map<string, number> {
+  const out = new Map<string, number>();
+  const sum = entries.reduce((acc, x) => acc + Math.abs(x.amount), 0);
+  if (sum <= 0 || total <= 0) return out;
+  for (const item of entries) {
+    out.set(item.mint, total * (Math.abs(item.amount) / sum));
+  }
+  return out;
+}
+
+type PositionState = {
+  mint: string;
+  qty: number;
+  costBasisSol: number;
+  realizedPnlSol: number;
+  buyCount: number;
+  sellCount: number;
+  firstBuyAt: number | null;
+  lastTradeAt: number | null;
+  closedTrades: number;
+  winningTrades: number;
+};
+
+function getOrCreatePosition(map: Map<string, PositionState>, mint: string): PositionState {
+  let pos = map.get(mint);
+  if (!pos) {
+    pos = {
+      mint,
+      qty: 0,
+      costBasisSol: 0,
+      realizedPnlSol: 0,
+      buyCount: 0,
+      sellCount: 0,
+      firstBuyAt: null,
+      lastTradeAt: null,
+      closedTrades: 0,
+      winningTrades: 0,
+    };
+    map.set(mint, pos);
+  }
+  return pos;
+}
+
 async function getWalletHoldings(wallet: string): Promise<WalletBuy[]> {
   const res = await rpc("getTokenAccountsByOwner", [
     wallet,
@@ -218,6 +334,7 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
   let solNet = 0;
   let txCount = 0;
   let lastSeen: number | null = null;
+  const positions = new Map<string, PositionState>();
 
   for (const sig of signatures) {
     let tx: any = null;
@@ -240,30 +357,58 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
 
     const solDelta = getSolDelta(tx, wallet);
     solNet += solDelta;
+    const tokenDeltas = getTokenDeltaMap(tx, wallet);
+    const tokenIns: Array<{ mint: string; amount: number }> = [];
+    const tokenOuts: Array<{ mint: string; amount: number }> = [];
+    for (const [mint, delta] of tokenDeltas.entries()) {
+      if (delta > 0) tokenIns.push({ mint, amount: delta });
+      else tokenOuts.push({ mint, amount: Math.abs(delta) });
+    }
 
-    const pre = (tx.meta.preTokenBalances || []).filter((b: any) => b.owner === wallet);
-    const post = (tx.meta.postTokenBalances || []).filter((b: any) => b.owner === wallet);
+    const buyCostByMint = solDelta < 0 ? allocByAmount(tokenIns, Math.abs(solDelta)) : new Map<string, number>();
+    const sellProceedsByMint = solDelta > 0 ? allocByAmount(tokenOuts, solDelta) : new Map<string, number>();
 
-    const preMap = new Map<string, number>(
-      pre.map((b: any) => [String(b.mint), tokenUiAmount(b)]),
-    );
-    for (const p of post) {
-      const mint = p.mint;
-      if (!mint || mint === WSOL_MINT) continue;
-      const preAmt = preMap.get(mint) || 0;
-      const postAmt = tokenUiAmount(p);
-      const delta = postAmt - preAmt;
-      if (delta > 0) {
-        buys.push({
-          mint,
-          amount: delta,
-          signature: sig.signature,
-          blockTime,
-          wallet,
-          solDelta,
-          source: "tx",
-        });
+    for (const buy of tokenIns) {
+      const pos = getOrCreatePosition(positions, buy.mint);
+      const buyCostSol = buyCostByMint.get(buy.mint) || 0;
+      pos.qty += buy.amount;
+      pos.costBasisSol += buyCostSol;
+      pos.buyCount += 1;
+      pos.lastTradeAt = blockTime || pos.lastTradeAt;
+      if (blockTime && (!pos.firstBuyAt || blockTime < pos.firstBuyAt)) {
+        pos.firstBuyAt = blockTime;
       }
+
+      buys.push({
+        mint: buy.mint,
+        amount: buy.amount,
+        signature: sig.signature,
+        blockTime,
+        wallet,
+        solDelta,
+        source: "tx",
+      });
+    }
+
+    for (const sell of tokenOuts) {
+      const pos = getOrCreatePosition(positions, sell.mint);
+      const sellQty = sell.amount;
+      const recognizedQty = Math.min(sellQty, Math.max(0, pos.qty));
+      const avgCostSol = pos.qty > 0 ? pos.costBasisSol / pos.qty : 0;
+      const recognizedCost = avgCostSol * recognizedQty;
+      const proceeds = (sellProceedsByMint.get(sell.mint) || 0) * (sellQty > 0 ? recognizedQty / sellQty : 0);
+      const realized = proceeds - recognizedCost;
+
+      if (recognizedQty > 0) {
+        pos.qty -= recognizedQty;
+        pos.costBasisSol = Math.max(0, pos.costBasisSol - recognizedCost);
+        pos.realizedPnlSol += realized;
+        pos.closedTrades += 1;
+        if (realized > 0) pos.winningTrades += 1;
+      }
+
+      pos.sellCount += 1;
+      pos.lastTradeAt = blockTime || pos.lastTradeAt;
     }
   }
 
@@ -276,7 +421,45 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
   }
 
   const uniqueMints = new Set(buys.map((b) => b.mint)).size;
-  return { wallet, buys, solNet, txCount, lastSeen, uniqueMints, sampledPnlSol: solNet };
+  const positionRows: WalletPosition[] = Array.from(positions.values()).map((pos) => ({
+    mint: pos.mint,
+    qty: pos.qty,
+    costBasisSol: pos.costBasisSol,
+    realizedPnlSol: pos.realizedPnlSol,
+    unrealizedPnlSol: 0,
+    totalPnlSol: pos.realizedPnlSol,
+    currentValueSol: 0,
+    avgCostSol: pos.qty > 0 ? pos.costBasisSol / pos.qty : 0,
+    buyCount: pos.buyCount,
+    sellCount: pos.sellCount,
+    firstBuyAt: pos.firstBuyAt,
+    lastTradeAt: pos.lastTradeAt,
+    holdSeconds: null,
+    closedTrades: pos.closedTrades,
+    winningTrades: pos.winningTrades,
+    winRate: pos.closedTrades > 0 ? pos.winningTrades / pos.closedTrades : null,
+  }));
+  const realizedPnlSol = positionRows.reduce((acc, p) => acc + p.realizedPnlSol, 0);
+  const closedTrades = positionRows.reduce((acc, p) => acc + p.closedTrades, 0);
+  const winningTrades = positionRows.reduce((acc, p) => acc + p.winningTrades, 0);
+  return {
+    wallet,
+    buys,
+    solNet,
+    txCount,
+    lastSeen,
+    uniqueMints,
+    sampledPnlSol: solNet,
+    realizedPnlSol,
+    unrealizedPnlSol: 0,
+    totalPnlSol: realizedPnlSol,
+    costBasisSol: positionRows.reduce((acc, p) => acc + p.costBasisSol, 0),
+    currentValueSol: 0,
+    closedTrades,
+    winningTrades,
+    winRate: closedTrades > 0 ? winningTrades / closedTrades : null,
+    positions: positionRows,
+  };
 }
 
 async function runInBatches(wallets: string[]): Promise<WalletActivity[]> {
@@ -296,6 +479,15 @@ async function runInBatches(wallets: string[]): Promise<WalletActivity[]> {
             lastSeen: null,
             uniqueMints: 0,
             sampledPnlSol: 0,
+            realizedPnlSol: 0,
+            unrealizedPnlSol: 0,
+            totalPnlSol: 0,
+            costBasisSol: 0,
+            currentValueSol: 0,
+            closedTrades: 0,
+            winningTrades: 0,
+            winRate: null,
+            positions: [],
           };
         }
       }),
@@ -469,6 +661,67 @@ async function mapMintMetaWithConcurrency(mints: string[]): Promise<Map<string, 
   return out;
 }
 
+async function getSolPriceUsd(mintMetaMap: Map<string, TopMint["token"]>): Promise<number | null> {
+  const fromCache = mintMetaMap.get(WSOL_MINT)?.priceUsd;
+  if (typeof fromCache === "number" && Number.isFinite(fromCache) && fromCache > 0) return fromCache;
+  const solMeta = await getMintMeta(WSOL_MINT);
+  const v = solMeta?.priceUsd;
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  return null;
+}
+
+function enrichWalletPnL(
+  activities: WalletActivity[],
+  mintMetaMap: Map<string, TopMint["token"]>,
+  solPriceUsd: number | null,
+) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  for (const item of activities) {
+    let unrealized = 0;
+    let costBasis = 0;
+    let currentValue = 0;
+    let realized = 0;
+    let closedTrades = 0;
+    let winningTrades = 0;
+
+    item.positions = item.positions.map((pos) => {
+      const meta = mintMetaMap.get(pos.mint);
+      const pxUsd = meta?.priceUsd ?? null;
+      const valueSol =
+        pos.qty > 0 && solPriceUsd && pxUsd && solPriceUsd > 0
+          ? (pos.qty * pxUsd) / solPriceUsd
+          : 0;
+      const unrealizedSol = valueSol - pos.costBasisSol;
+      const totalSol = pos.realizedPnlSol + unrealizedSol;
+      const holdSeconds = pos.firstBuyAt ? Math.max(0, nowSec - pos.firstBuyAt) : null;
+
+      realized += pos.realizedPnlSol;
+      unrealized += unrealizedSol;
+      costBasis += pos.costBasisSol;
+      currentValue += valueSol;
+      closedTrades += pos.closedTrades;
+      winningTrades += pos.winningTrades;
+
+      return {
+        ...pos,
+        unrealizedPnlSol: unrealizedSol,
+        totalPnlSol: totalSol,
+        currentValueSol: valueSol,
+        holdSeconds,
+      };
+    });
+
+    item.realizedPnlSol = realized;
+    item.unrealizedPnlSol = unrealized;
+    item.totalPnlSol = realized + unrealized;
+    item.costBasisSol = costBasis;
+    item.currentValueSol = currentValue;
+    item.closedTrades = closedTrades;
+    item.winningTrades = winningTrades;
+    item.winRate = closedTrades > 0 ? winningTrades / closedTrades : null;
+  }
+}
+
 function readFileCache(): SmartWalletSnapshot | null {
   try {
     const raw = fs.readFileSync(FILE_CACHE_PATH, "utf-8");
@@ -485,7 +738,6 @@ function isFresh(snapshot: SmartWalletSnapshot): boolean {
 }
 
 async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
-
   const wallets = loadWallets();
   const activity = await runInBatches(wallets);
 
@@ -501,28 +753,6 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     const uniqueWallets = new Set(byMint[mint].buys.map((b) => b.wallet));
     byMint[mint].walletCount = uniqueWallets.size;
   }
-
-  const topWallets: TopWallet[] = activity
-    .map((item) => ({
-      wallet: item.wallet,
-      buyCount: item.buys.length,
-      uniqueMints: item.uniqueMints,
-      sampledPnlSol: item.sampledPnlSol,
-      txCount: item.txCount,
-      lastSeen: item.lastSeen,
-      topMints: Array.from(
-        new Set(
-          item.buys
-            .sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
-            .map((buy) => buy.mint),
-        ),
-      ).slice(0, 3),
-    }))
-    .sort((a, b) => {
-      if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
-      if (b.sampledPnlSol !== a.sampledPnlSol) return b.sampledPnlSol - a.sampledPnlSol;
-      return b.uniqueMints - a.uniqueMints;
-    });
 
   const rankedMints = Object.entries(byMint)
     .map(([mint, value]) => ({
@@ -542,9 +772,48 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       return b.buyCount - a.buyCount;
     });
 
-  const mintMetaMap = await mapMintMetaWithConcurrency(
-    rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => item.mint),
+  const pnlMints = Array.from(
+    new Set(
+      activity.flatMap((item) => item.positions.map((pos) => pos.mint)),
+    ),
   );
+  const mintsForMeta = Array.from(
+    new Set([
+      ...rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => item.mint),
+      ...pnlMints.slice(0, TOKEN_METADATA_LIMIT),
+      WSOL_MINT,
+    ]),
+  );
+  const mintMetaMap = await mapMintMetaWithConcurrency(mintsForMeta);
+  const solPriceUsd = await getSolPriceUsd(mintMetaMap);
+  enrichWalletPnL(activity, mintMetaMap, solPriceUsd);
+
+  const topWallets: TopWallet[] = activity
+    .map((item) => ({
+      wallet: item.wallet,
+      buyCount: item.buys.length,
+      uniqueMints: item.uniqueMints,
+      sampledPnlSol: item.sampledPnlSol,
+      realizedPnlSol: item.realizedPnlSol,
+      unrealizedPnlSol: item.unrealizedPnlSol,
+      totalPnlSol: item.totalPnlSol,
+      winRate: item.winRate,
+      closedTrades: item.closedTrades,
+      txCount: item.txCount,
+      lastSeen: item.lastSeen,
+      topMints: Array.from(
+        new Set(
+          item.buys
+            .sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+            .map((buy) => buy.mint),
+        ),
+      ).slice(0, 3),
+    }))
+    .sort((a, b) => {
+      if (b.totalPnlSol !== a.totalPnlSol) return b.totalPnlSol - a.totalPnlSol;
+      if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
+      return b.uniqueMints - a.uniqueMints;
+    });
 
   const topMints: TopMint[] = rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => ({
     mint: item.mint,

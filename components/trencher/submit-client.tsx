@@ -32,7 +32,7 @@ export default function SubmitClient() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!connected || !publicKey || !signMessage || !sendTransaction) {
+    if (!connected || !publicKey || !signMessage || (!signTransaction && !sendTransaction)) {
       setError("Connect wallet first.");
       return;
     }

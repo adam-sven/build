@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
 type WalletBuy = {
   mint: string;
@@ -28,6 +29,11 @@ type TopWallet = {
   buyCount: number;
   uniqueMints: number;
   sampledPnlSol: number;
+  realizedPnlSol: number;
+  unrealizedPnlSol: number;
+  totalPnlSol: number;
+  winRate: number | null;
+  closedTrades: number;
   txCount: number;
   lastSeen: number | null;
   topMints: string[];
@@ -95,6 +101,11 @@ const formatSol = (val: number) => {
   return `${sign}${val.toFixed(2)} SOL`;
 };
 
+const formatWinRatePct = (val: number | null) => {
+  if (val === null) return "—";
+  return `${(val * 100).toFixed(0)}%`;
+};
+
 const formatUsd = (val: number | null) => {
   if (val === null) return '—';
   if (val < 0.01) return `$${val.toFixed(6)}`;
@@ -118,17 +129,34 @@ export default function SmartWalletsPage() {
   const [expandedMint, setExpandedMint] = useState<string | null>(null);
   const [walletFilter, setWalletFilter] = useState('');
   const [mintFilter, setMintFilter] = useState('');
+  const sessionKey = 'trencher:smart:snapshot:v1';
+
+  const hasSnapshotRows = (snapshot: SmartWalletSnapshot | null) => {
+    if (!snapshot) return false;
+    return (snapshot.topWallets?.length || 0) + (snapshot.topMints?.length || 0) > 0;
+  };
 
   useEffect(() => {
     let ignore = false;
+    const cached = readSessionJson<SmartWalletSnapshot>(sessionKey);
+    const hasCachedRows = hasSnapshotRows(cached);
+    if (cached?.ok) {
+      setData(cached);
+    }
 
     const load = async (force = false, silent = false) => {
-      if (!silent) setLoading(true);
+      if (!silent && !hasCachedRows) setLoading(true);
       try {
         const res = await fetch(`/api/smart-wallets${force ? '?force=1' : ''}`);
         const json: SmartWalletSnapshot = await res.json();
         if (!ignore && json?.ok) {
-          setData(json);
+          setData((prev) => {
+            const nextHasRows = hasSnapshotRows(json);
+            const prevHasRows = hasSnapshotRows(prev);
+            const next = !nextHasRows && prevHasRows ? prev : json;
+            writeSessionJson(sessionKey, next);
+            return next;
+          });
         }
       } finally {
         if (!ignore && !silent) setLoading(false);
@@ -149,7 +177,15 @@ export default function SmartWalletsPage() {
     try {
       const res = await fetch('/api/smart-wallets?force=1');
       const json: SmartWalletSnapshot = await res.json();
-      if (json?.ok) setData(json);
+      if (json?.ok) {
+        setData((prev) => {
+          const nextHasRows = hasSnapshotRows(json);
+          const prevHasRows = hasSnapshotRows(prev);
+          const next = !nextHasRows && prevHasRows ? prev : json;
+          writeSessionJson(sessionKey, next);
+          return next;
+        });
+      }
     } finally {
       setRefreshing(false);
     }
@@ -248,7 +284,7 @@ export default function SmartWalletsPage() {
                   className="w-40 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs text-white/80 placeholder:text-white/40 focus:outline-none focus:border-white/30"
                 />
               </div>
-              <p className="mt-1 text-xs text-white/50">PnL is sampled SOL net flow from recent transactions.</p>
+              <p className="mt-1 text-xs text-white/50">PnL shows realized + unrealized SOL estimate from sampled trades and live token prices.</p>
             </div>
 
             <div className="max-h-[62vh] overflow-y-auto">
@@ -274,8 +310,8 @@ export default function SmartWalletsPage() {
                             Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
                           </div>
                         </div>
-                        <div className={`text-sm font-semibold ${wallet.sampledPnlSol >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                          {formatSol(wallet.sampledPnlSol)}
+                        <div className={`text-sm font-semibold ${(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                          {formatSol(wallet.totalPnlSol ?? wallet.sampledPnlSol)}
                         </div>
                       </div>
                     </button>
@@ -283,6 +319,12 @@ export default function SmartWalletsPage() {
                     {isOpen && details && (
                       <div className="px-4 pb-4">
                         <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                          <div className="mb-2 grid grid-cols-2 gap-2 text-[11px] text-white/70">
+                            <div>Realized: <span className={(wallet.realizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSol(wallet.realizedPnlSol || 0)}</span></div>
+                            <div>Unrealized: <span className={(wallet.unrealizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSol(wallet.unrealizedPnlSol || 0)}</span></div>
+                            <div>Win rate: <span className="text-white/85">{formatWinRatePct(wallet.winRate)}</span></div>
+                            <div>Closed trades: <span className="text-white/85">{wallet.closedTrades || 0}</span></div>
+                          </div>
                           <div className="flex items-center justify-between">
                             <div className="text-xs uppercase tracking-widest text-white/45">Recent buys</div>
                             <Link
@@ -420,6 +462,24 @@ export default function SmartWalletsPage() {
                                 Buy Now
                               </a>
                             </Button>
+                            <Button asChild variant="outline" className="h-8 rounded-lg border-white/20 bg-white/5 text-white hover:bg-white/10">
+                              <a
+                                href="https://trade.padre.gg/rk/trencherdex"
+                                target="_blank"
+                                rel="noreferrer nofollow noopener"
+                              >
+                                Padre
+                              </a>
+                            </Button>
+                            <Button asChild variant="outline" className="h-8 rounded-lg border-white/20 bg-white/5 text-white hover:bg-white/10">
+                              <a
+                                href="https://axiom.trade/@kingsven"
+                                target="_blank"
+                                rel="noreferrer nofollow noopener"
+                              >
+                                Axiom
+                              </a>
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -432,7 +492,7 @@ export default function SmartWalletsPage() {
         </div>
 
         <div className="mt-5 text-xs text-white/40 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-          Data auto-refreshes every few minutes on the backend and every 90 seconds in this UI.
+          Data auto-refreshes every few minutes on the backend and every 20 seconds in this UI.
         </div>
       </div>
     </main>

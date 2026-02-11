@@ -176,35 +176,6 @@ export async function GET(request: NextRequest) {
       void runLiveRefresh("solana", "smart");
     }
 
-    if (webhookMode) {
-      if (force) {
-        const refreshed = await refreshAndStoreSmartSnapshotFromEvents();
-        if (refreshed) {
-          const hydrated = await hydrateTopMintMeta(refreshed);
-          return NextResponse.json(hydrated, {
-            headers: {
-              "Cache-Control": "no-store, max-age=0",
-              "X-Smart-Cache": "force-refresh",
-              "X-Smart-Source": "webhook",
-            },
-          });
-        }
-      }
-
-      const cachedWebhook = await getStoredSmartSnapshotFromEvents();
-      if (cachedWebhook) {
-        const hydrated = await hydrateTopMintMeta(cachedWebhook);
-        return NextResponse.json(hydrated, {
-          headers: {
-            "Cache-Control": "public, s-maxage=20, stale-while-revalidate=120",
-            "X-Smart-Stale": "0",
-            "X-Smart-Source": "webhook",
-            "X-Smart-Hydrate": "fresh",
-          },
-        });
-      }
-    }
-
     if (force) {
       const data = await buildSmartWalletSnapshot(true);
       const hydrated = await hydrateTopMintMeta(data);
@@ -214,6 +185,19 @@ export async function GET(request: NextRequest) {
           "X-Smart-Cache": "force-refresh",
         },
       });
+    }
+
+    if (webhookMode) {
+      const cachedWebhook = await getStoredSmartSnapshotFromEvents();
+      if (cachedWebhook) {
+        const hasPnl = Array.isArray((cachedWebhook as any)?.activity)
+          && (cachedWebhook as any).activity.some((a: any) => Array.isArray(a?.positions));
+        if (!hasPnl) {
+          void refreshAndStoreSmartSnapshotFromEvents();
+        }
+      } else {
+        void refreshAndStoreSmartSnapshotFromEvents();
+      }
     }
 
     const { data, stale, source } = await getSmartWalletSnapshot();

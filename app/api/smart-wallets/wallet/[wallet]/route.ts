@@ -37,6 +37,8 @@ async function fetchTokenMeta(mint: string) {
       change24h: pair?.priceChange?.h24 ?? null,
       volume24h: pair?.volume?.h24 ?? null,
       liquidityUsd: pair?.liquidity?.usd ?? null,
+      marketCapUsd: pair?.marketCap ?? null,
+      fdvUsd: pair?.fdv ?? null,
       pairUrl: pair?.url || null,
       dex: pair?.dexId || null,
     };
@@ -54,13 +56,16 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   const webhookSnapshot = process.env.SMART_USE_WEBHOOK_EVENTS !== "false"
     ? await getStoredSmartSnapshotFromEvents()
     : null;
-  const { data } = webhookSnapshot
+  const webhookHasPnl = Array.isArray((webhookSnapshot as any)?.activity)
+    && (webhookSnapshot as any).activity.some((a: any) => Array.isArray(a?.positions));
+  const { data } = webhookSnapshot && webhookHasPnl
     ? { data: webhookSnapshot }
     : await getSmartWalletSnapshot();
   const activity = (data.activity || []).find((x) => x.wallet === wallet);
   if (!activity) {
     return NextResponse.json({ ok: false, error: "wallet_not_found" }, { status: 404 });
   }
+  const activityAny = activity as any;
 
   const tokenMap = new Map<string, any>();
   for (const row of data.topMints || []) {
@@ -74,7 +79,11 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     byMint.set(buy.mint, list);
   }
 
-  const mints = Array.from(byMint.keys());
+  const positionByMint = new Map<string, any>();
+  for (const pos of activityAny.positions || []) {
+    positionByMint.set(String(pos.mint || ""), pos);
+  }
+  const mints = Array.from(new Set([...byMint.keys(), ...positionByMint.keys()]));
   const missing = mints.filter((mint) => !tokenMap.has(mint)).slice(0, 18);
   const fetched = await Promise.all(missing.map(async (mint) => [mint, await fetchTokenMeta(mint)] as const));
   for (const [mint, token] of fetched) {
@@ -99,15 +108,23 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
       const meta = tokenMap.get(mint) || null;
       const amountTotal = list.reduce((sum, x) => sum + (x.amount || 0), 0);
       const flow = list.reduce((sum, x) => sum + (x.solDelta || 0), 0);
+      const pos = positionByMint.get(mint) || null;
 
       return {
         mint,
         buyCount: list.length,
+        sellCount: pos?.sellCount || 0,
+        qty: pos?.qty || 0,
         amountTotal,
         sampledSolFlow: flow,
+        realizedPnlSol: pos?.realizedPnlSol || 0,
+        unrealizedPnlSol: pos?.unrealizedPnlSol || 0,
+        totalPnlSol: pos?.totalPnlSol || 0,
+        avgCostSol: pos?.avgCostSol || 0,
+        currentValueSol: pos?.currentValueSol || 0,
         firstSeen,
         lastSeen,
-        sampledHoldSeconds: holdSeconds,
+        sampledHoldSeconds: pos?.holdSeconds ?? holdSeconds,
         latestTx: list[0] || null,
         token: {
           name: meta?.name || null,
@@ -117,12 +134,15 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
           change24h: meta?.change24h ?? null,
           volume24h: meta?.volume24h ?? null,
           liquidityUsd: meta?.liquidityUsd ?? null,
+          marketCapUsd: meta?.marketCapUsd ?? null,
+          fdvUsd: meta?.fdvUsd ?? null,
           pairUrl: meta?.pairUrl || null,
           dex: meta?.dex || null,
         },
       };
     })
     .sort((a, b) => {
+      if (b.totalPnlSol !== a.totalPnlSol) return b.totalPnlSol - a.totalPnlSol;
       if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
       return (b.lastSeen || 0) - (a.lastSeen || 0);
     });
@@ -142,6 +162,14 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     updatedAt: data.timestamp,
     summary: {
       sampledPnlSol: activity.sampledPnlSol,
+      realizedPnlSol: activityAny.realizedPnlSol || 0,
+      unrealizedPnlSol: activityAny.unrealizedPnlSol || 0,
+      totalPnlSol: activityAny.totalPnlSol || 0,
+      winRate: activityAny.winRate ?? null,
+      closedTrades: activityAny.closedTrades || 0,
+      winningTrades: activityAny.winningTrades || 0,
+      costBasisSol: activityAny.costBasisSol || 0,
+      currentValueSol: activityAny.currentValueSol || 0,
       txCount: activity.txCount,
       buyCount: activity.buys.length,
       uniqueMints: activity.uniqueMints,

@@ -10,6 +10,14 @@ type WalletProfile = {
   updatedAt: string;
   summary: {
     sampledPnlSol: number;
+    realizedPnlSol: number;
+    unrealizedPnlSol: number;
+    totalPnlSol: number;
+    winRate: number | null;
+    closedTrades: number;
+    winningTrades: number;
+    costBasisSol: number;
+    currentValueSol: number;
     txCount: number;
     buyCount: number;
     uniqueMints: number;
@@ -18,8 +26,15 @@ type WalletProfile = {
   tokens: Array<{
     mint: string;
     buyCount: number;
+    sellCount: number;
+    qty: number;
     amountTotal: number;
     sampledSolFlow: number;
+    realizedPnlSol: number;
+    unrealizedPnlSol: number;
+    totalPnlSol: number;
+    avgCostSol: number;
+    currentValueSol: number;
     firstSeen: number | null;
     lastSeen: number | null;
     sampledHoldSeconds: number | null;
@@ -31,6 +46,8 @@ type WalletProfile = {
       change24h: number | null;
       volume24h: number | null;
       liquidityUsd: number | null;
+      marketCapUsd: number | null;
+      fdvUsd: number | null;
       pairUrl: string | null;
       dex: string | null;
     };
@@ -73,6 +90,16 @@ function formatDuration(seconds: number | null) {
   if (d > 0) return `${d}d ${h}h`;
   const m = Math.floor((seconds % 3600) / 60);
   return `${h}h ${m}m`;
+}
+
+function formatWinRate(v: number | null) {
+  if (v === null) return "-";
+  return `${(v * 100).toFixed(0)}%`;
+}
+
+function sol(v: number) {
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(2)} SOL`;
 }
 
 function formatTime(sec: number | null) {
@@ -127,16 +154,22 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
       {data && (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <Stat title="Sampled PnL" value={`${data.summary.sampledPnlSol > 0 ? "+" : ""}${data.summary.sampledPnlSol.toFixed(2)} SOL`} tone={data.summary.sampledPnlSol >= 0 ? "good" : "bad"} />
+            <Stat title="Total PnL" value={sol(data.summary.totalPnlSol)} tone={data.summary.totalPnlSol >= 0 ? "good" : "bad"} />
+            <Stat title="Realized" value={sol(data.summary.realizedPnlSol)} tone={data.summary.realizedPnlSol >= 0 ? "good" : "bad"} />
+            <Stat title="Unrealized" value={sol(data.summary.unrealizedPnlSol)} tone={data.summary.unrealizedPnlSol >= 0 ? "good" : "bad"} />
             <Stat title="Buys" value={String(data.summary.buyCount)} />
+            <Stat title="Win Rate" value={formatWinRate(data.summary.winRate)} />
+          </div>
+          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
             <Stat title="Unique tokens" value={String(data.summary.uniqueMints)} />
             <Stat title="Transactions" value={String(data.summary.txCount)} />
+            <Stat title="Closed trades" value={String(data.summary.closedTrades)} />
             <Stat title="Last seen" value={formatTime(data.summary.lastSeen)} />
           </div>
 
           <section className="rounded-2xl border border-white/10 bg-black/30 p-4">
-            <h2 className="text-base font-semibold">Bought Tokens (sampled)</h2>
-            <p className="mt-1 text-xs text-white/55">Hold time is sampled age from first observed buy in this dataset.</p>
+            <h2 className="text-base font-semibold">Token Positions</h2>
+            <p className="mt-1 text-xs text-white/55">PnL = realized + unrealized (SOL estimate from live USD token prices).</p>
             <div className="mt-3 space-y-2">
               {topTokens.map((item) => (
                 <div key={item.mint} className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-black/25 p-3 md:grid-cols-[1.3fr_1fr_1fr_1fr_auto] md:items-center">
@@ -152,15 +185,15 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
                     </div>
                   </div>
                   <div className="text-xs text-white/70">
-                    <div>Buys: {item.buyCount}</div>
-                    <div>Amount: {item.amountTotal.toFixed(2)}</div>
+                    <div>Buys/Sells: {item.buyCount}/{item.sellCount}</div>
+                    <div>Qty: {item.qty.toFixed(2)}</div>
                   </div>
                   <div className="text-xs text-white/70">
                     <div>Price: {usd(item.token.priceUsd)}</div>
-                    <div>24h: <span className={item.token.change24h !== null && item.token.change24h >= 0 ? "text-emerald-300" : "text-red-300"}>{pct(item.token.change24h)}</span></div>
+                    <div>PnL: <span className={item.totalPnlSol >= 0 ? "text-emerald-300" : "text-red-300"}>{sol(item.totalPnlSol)}</span></div>
                   </div>
                   <div className="text-xs text-white/70">
-                    <div>Liq: {usd(item.token.liquidityUsd)}</div>
+                    <div>Real/Unreal: {sol(item.realizedPnlSol)} / {sol(item.unrealizedPnlSol)}</div>
                     <div>Hold age: {formatDuration(item.sampledHoldSeconds)}</div>
                   </div>
                   <div className="flex gap-2">

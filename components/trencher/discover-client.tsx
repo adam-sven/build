@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { DiscoverMode, DiscoverResponse, TokenRowSummary } from "@/lib/trencher/types";
 import VoteModal from "@/components/trencher/vote-modal";
+import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 
 const MODES: DiscoverMode[] = ["trending", "new", "voted", "quality"];
 
@@ -84,19 +85,31 @@ export default function DiscoverClient() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<TokenRowSummary[]>([]);
   const [voteTarget, setVoteTarget] = useState<{ mint: string; direction: "up" | "down" } | null>(null);
+  const sessionKey = `trencher:discover:${mode}:v1`;
 
   const load = async (m: DiscoverMode, silent = false) => {
-    if (!silent) setLoading(true);
+    const cached = readSessionJson<DiscoverResponse>(`trencher:discover:${m}:v1`);
+    if (!silent && !cached?.ok) setLoading(true);
+    if (!silent && cached?.ok) {
+      setItems(cached.items || []);
+    }
     try {
       const res = await fetch(`/api/ui/discover?chain=solana&mode=${m}`);
       const json: DiscoverResponse = await res.json();
-      if (json?.ok) setItems(json.items);
+      if (json?.ok) {
+        setItems(json.items);
+        writeSessionJson(`trencher:discover:${m}:v1`, json);
+      }
     } finally {
       if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
+    const cached = readSessionJson<DiscoverResponse>(sessionKey);
+    if (cached?.ok) {
+      setItems(cached.items || []);
+    }
     load(mode);
   }, [mode]);
 

@@ -122,7 +122,13 @@ export default function VoteModal({ mint, direction, onClose, onSuccess }: Props
           <DialogTitle>Cast vote</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-white/70">Step {step}/2</p>
-        <p className="text-sm text-white/60">Fee is anti-spam only. It does not guarantee ranking.</p>
+        <div className="rounded border border-white/10 bg-black/30 p-3 text-xs text-white/70">
+          <p className="font-medium text-white/85">Voting requirements</p>
+          <p className="mt-1">1. Wallet age must be at least 7 days.</p>
+          <p>2. Wallet must hold at least 0.1 SOL (proof-of-activity check, not spent).</p>
+          <p>3. Vote fee is 0.001 SOL sent to treasury (anti-spam).</p>
+          <p className="mt-1 text-white/55">Fee does not guarantee ranking placement.</p>
+        </div>
         <p className="text-xs text-white/50">
           Treasury: {TREASURY_PUBKEY.slice(0, 6)}...{TREASURY_PUBKEY.slice(-6)}
         </p>
