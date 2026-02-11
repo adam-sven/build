@@ -968,6 +968,18 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     },
   };
 
+  if (canUsePrevious) {
+    const prevRows = (previous.topWallets?.length || 0) + (previous.topMints?.length || 0);
+    const nextRows = (snapshot.topWallets?.length || 0) + (snapshot.topMints?.length || 0);
+    const severeCollapse =
+      prevRows >= 20 &&
+      nextRows < Math.max(8, Math.floor(prevRows * 0.45));
+    if (severeCollapse) {
+      cache = { timestamp: Date.now(), data: previous };
+      return previous;
+    }
+  }
+
   cache = { timestamp: Date.now(), data: snapshot };
   try {
     fs.writeFileSync(FILE_CACHE_PATH, JSON.stringify(snapshot));

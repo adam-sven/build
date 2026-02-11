@@ -117,6 +117,9 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const sessionKey = "trencher:dashboard:v1";
 
+  const snapshotRows = (s: SmartWalletSnapshot | null | undefined) =>
+    (s?.topWallets?.length || 0) + (s?.topMints?.length || 0);
+
   async function fetchJsonWithTimeout(url: string, timeoutMs = 12_000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -147,8 +150,19 @@ export default function DashboardClient() {
       const pumpJson = pumpRes.status === "fulfilled" ? pumpRes.value : null;
 
       const nextDiscover = discoverJson?.ok ? discoverJson : cached?.discover || null;
-      const nextSmart = smartJson?.ok ? smartJson : cached?.smart || null;
+      let nextSmart = smartJson?.ok ? smartJson : cached?.smart || null;
       const nextPump = pumpJson?.ok ? pumpJson : cached?.pump || null;
+
+      const prevSmart = (cached?.smart?.ok ? cached.smart : smart) || null;
+      const prevRows = snapshotRows(prevSmart);
+      const nextRows = snapshotRows(nextSmart);
+      const severeDrop =
+        prevRows >= 20 &&
+        nextRows > 0 &&
+        nextRows < Math.max(8, Math.floor(prevRows * 0.45));
+      if (severeDrop) {
+        nextSmart = prevSmart;
+      }
 
       if (nextDiscover?.ok) setDiscover(nextDiscover);
       if (nextSmart?.ok) setSmart(nextSmart);
