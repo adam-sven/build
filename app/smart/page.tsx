@@ -575,30 +575,20 @@ export default function SmartWalletsPage() {
                   <div key={token.mint} className="border-b border-white/5">
                     <Link
                       href={`/intel?mint=${token.mint}`}
-                      className="block w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
+                      className="block w-full px-3 py-2 text-left transition-colors hover:bg-white/5"
                     >
-                      <div className="grid grid-cols-[28px_1fr_auto] gap-3 items-center">
-                        <div className="text-xs text-white/40">#{index + 1}</div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <TokenAvatar image={token.token.image} symbol={token.token.symbol} mint={token.mint} />
-                            <span className="font-semibold">
-                              {token.token.symbol || shortAddr(token.mint, 4, 4)}
-                            </span>
-                            <span className="text-xs text-white/45">
-                              {token.token.name || shortAddr(token.mint, 6, 6)}
-                            </span>
+                      <div className="grid grid-cols-[20px_1fr_auto] gap-2 items-center">
+                        <div className="text-[10px] text-white/40">#{index + 1}</div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm">
+                            <span className="font-semibold text-white/95">{token.token.symbol || shortAddr(token.mint, 4, 4)}</span>
+                            <span className="ml-1 text-white/45">{token.token.name || shortAddr(token.mint, 6, 6)}</span>
                           </div>
-                          <div className="mt-1 text-xs text-white/60">
-                            {token.walletCount} wallets • {token.buyCount} buys
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
-                            <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-white/90">MCAP {formatUsd(token.token.marketCapUsd)}</span>
-                            <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-white/90">VOL {formatUsd(token.token.volume24h)}</span>
-                            <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">LIQ {formatUsd(token.token.liquidityUsd)}</span>
+                          <div className="mt-0.5 truncate text-[11px] text-white/55">
+                            {token.walletCount}w • {token.buyCount}b • MCap {formatUsd(token.token.marketCapUsd)} • Vol {formatUsd(token.token.volume24h)} • Liq {formatUsd(token.token.liquidityUsd)}
                           </div>
                         </div>
-                        <div className={`text-base font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
+                        <div className={`text-sm font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
                       </div>
                     </Link>
                   </div>

@@ -119,6 +119,7 @@ export default function DashboardClient() {
 
   const snapshotRows = (s: SmartWalletSnapshot | null | undefined) =>
     (s?.topWallets?.length || 0) + (s?.topMints?.length || 0);
+  const hasSmartRows = (s: SmartWalletSnapshot | null | undefined) => snapshotRows(s) > 0;
 
   async function fetchJsonWithTimeout(url: string, timeoutMs = 12_000) {
     const controller = new AbortController();
@@ -162,6 +163,22 @@ export default function DashboardClient() {
         nextRows < Math.max(8, Math.floor(prevRows * 0.45));
       if (severeDrop) {
         nextSmart = prevSmart;
+      }
+
+      // If Smart snapshot comes back empty, keep previous shared snapshot or force one rebuild.
+      if (!hasSmartRows(nextSmart)) {
+        if (hasSmartRows(prevSmart)) {
+          nextSmart = prevSmart;
+        } else {
+          try {
+            const forced = await fetchJsonWithTimeout("/api/smart-wallets?force=1", silent ? 10_000 : 20_000);
+            if (forced?.ok && hasSmartRows(forced)) {
+              nextSmart = forced;
+            }
+          } catch {
+            // keep existing fallback
+          }
+        }
       }
 
       if (nextDiscover?.ok) setDiscover(nextDiscover);
