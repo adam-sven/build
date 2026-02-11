@@ -81,6 +81,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const [showVoters, setShowVoters] = useState(false);
   const [recentVoters, setRecentVoters] = useState<string[]>([]);
   const [chartSource, setChartSource] = useState<"native" | "gmgn">("gmgn");
+  const [logoOnlyBranding, setLogoOnlyBranding] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sampleMints = [
     "So11111111111111111111111111111111111111112",
@@ -338,6 +339,16 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                   >
                     GMGN
                   </Button>
+                  {chartSource === "gmgn" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`border-white/20 ${logoOnlyBranding ? "bg-white/10 text-white" : "text-white/70"}`}
+                      onClick={() => setLogoOnlyBranding((x) => !x)}
+                    >
+                      {logoOnlyBranding ? "Branding: Logo Only" : "Branding: Full"}
+                    </Button>
+                  )}
                 </div>
               </div>
               <Tabs value={interval} onValueChange={(v) => setChartInterval(v as Interval)}>
@@ -361,14 +372,27 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 </div>
               )}
               {chartSource === "gmgn" && (
-                <iframe
-                  key={`${data.mint}:${interval}`}
-                  src={gmgnSrc}
-                  title="GMGN chart"
-                  className="h-full w-full"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
+                <>
+                  <iframe
+                    key={`${data.mint}:${interval}`}
+                    src={gmgnSrc}
+                    title="GMGN chart"
+                    className="h-full w-full bg-transparent"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                  {logoOnlyBranding && (
+                    <>
+                      <div aria-hidden className="pointer-events-none absolute bottom-2 left-2 h-5 w-28 rounded-sm bg-black/80" />
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute bottom-2 left-2 inline-flex h-5 items-center rounded-sm border border-white/15 bg-black/85 px-2 text-[10px] font-semibold tracking-wide text-white/85"
+                      >
+                        GMGN
+                      </div>
+                    </>
+                  )}
+                </>
               )}
               {chartSource === "native" && chartSeries.length > 1 && (
                 <NativeCandleChart symbol={data.identity.symbol || "TOKEN"} data={chartSeries} />
