@@ -13,7 +13,7 @@ export default function Page() {
   const [hasAccess, setHasAccess] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [openEntryId, setOpenEntryId] = useState<number | null>(10);
+  const [openEntryId, setOpenEntryId] = useState<number | null>(11);
 
   // Check token access in one place for easy future SPL token balance check
   const checkAccess = async (wallet: string): Promise<boolean> => {
@@ -47,6 +47,70 @@ export default function Page() {
   };
 
   const entries = [
+    {
+      id: 11,
+      title: 'Experiment #11 — UX Hardening + 24h PnL Window + Hot-Mint Fast Lane (v1.8)',
+      date: '2026-02-11',
+      sections: [
+        {
+          heading: 'What shipped',
+          items: [
+            'Added strict rolling 24h filter for Smart Wallet PnL computation (`SMART_PNL_WINDOW_SEC`).',
+            'Added hot-mint fast lane refresh in Smart Wallet API so top tracked tokens react faster to rug/volatility moves.',
+            'Aligned Dashboard Top Traders with Smart Wallet filtering logic so both surfaces show consistent wallet sets.',
+            'Added full-site animated market-cap tickers and a clickable live terminal status panel in the bottom-right badge.',
+            'Improved mobile header/search layout (wallet/menu/search controls no longer overlap).',
+            'Removed global max-width caps on core Trencher pages to use full available width.'
+          ]
+        },
+        {
+          heading: 'Why',
+          content: 'Users reported inconsistent trader lists between pages, stale-looking token reactions during fast rug events, and cramped/overlapping controls on mobile. This update focused on trust in metrics + responsive UI clarity + faster perceived market updates.'
+        },
+        {
+          heading: 'How it works',
+          items: [
+            'Smart wallet transaction parsing now skips wallet transactions older than `now - SMART_PNL_WINDOW_SEC` before PnL aggregation.',
+            'Hot lane refreshes top N Smart Wallet mints using Dexscreener token batches with short TTL, updating MC/liq/vol/change without forcing heavier wallet-RPC recomputation.',
+            'Dashboard trader panel now reuses the same identity/activity filter semantics as Smart Wallet leaderboard.',
+            'Live status badge now records rolling poll lines (latency + age) and exposes a terminal-style panel for quick health checks.',
+            'Global layout now keeps a single clear mobile control row and full-width content containers across dashboard/discover/smart/intel.'
+          ]
+        },
+        {
+          heading: 'What it is NOT',
+          items: [
+            'Not full trade-ledger accounting for every high-frequency wallet.',
+            'Not sub-second tick streaming for all mints.',
+            'Not complete elimination of provider-lag when upstream endpoints are degraded.'
+          ]
+        },
+        {
+          heading: 'Known limitations',
+          items: [
+            'PnL remains sample-bounded by signature/transaction caps per wallet under extreme volume.',
+            'Fast lane improves top-mint reaction speed but still depends on external market-data freshness.',
+            'Named/social-only leaderboard mode intentionally hides unidentified wallets from default view.'
+          ]
+        },
+        {
+          heading: 'Next step',
+          content: 'Add explicit leaderboard mode toggles (`named only` vs `all active`) and expose a snapshot diagnostics row (tracked/active/shown/recent-events) directly in Smart Wallet header.'
+        },
+        {
+          heading: 'Link(s)',
+          items: [
+            '/smart',
+            '/dashboard',
+            '/discover',
+            '/api/smart-wallets',
+            '/api/ui/live-status',
+            'lib/smart-wallets.ts',
+            'app/api/smart-wallets/route.ts'
+          ]
+        }
+      ]
+    },
     {
       id: 10,
       title: 'Experiment #10 — Webhook Health + Smart Token Meta Fill (v1.7)',
