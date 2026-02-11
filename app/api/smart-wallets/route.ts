@@ -17,6 +17,27 @@ let jupFetchedAt = 0;
 const HYDRATE_CACHE_TTL_MS = Number(process.env.SMART_HYDRATE_TTL_MS || "120000");
 let hydratedCache: { at: number; fingerprint: string; data: any } | null = null;
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const HOT_MINT_COUNT = Number(process.env.SMART_HOT_MINT_COUNT || "12");
+const HOT_MINT_TTL_MS = Number(process.env.SMART_HOT_MINT_TTL_MS || "30000");
+const hotMintCache = new Map<
+  string,
+  {
+    at: number;
+    token: {
+      name: string | null;
+      symbol: string | null;
+      image: string | null;
+      priceUsd: number | null;
+      change24h: number | null;
+      volume24h: number | null;
+      liquidityUsd: number | null;
+      marketCapUsd: number | null;
+      fdvUsd: number | null;
+      pairUrl: string | null;
+      dex: string | null;
+    };
+  }
+>();
 
 function getIp(request: NextRequest): string {
   const fwd = request.headers.get("x-forwarded-for");
@@ -153,6 +174,78 @@ async function hydrateTopMintMeta(data: any) {
   return data;
 }
 
+async function applyHotMintFastLane(data: any) {
+  const rows = Array.isArray(data?.topMints) ? data.topMints : [];
+  if (!rows.length || HOT_MINT_COUNT <= 0) return data;
+
+  const hotRows = rows
+    .slice(0, HOT_MINT_COUNT)
+    .filter((r: any) => MINT_RE.test(String(r?.mint || "")));
+  if (!hotRows.length) return data;
+
+  const now = Date.now();
+  const staleMints: string[] = [];
+  for (const row of hotRows) {
+    const mint = String(row.mint);
+    const cached = hotMintCache.get(mint);
+    if (cached && now - cached.at <= HOT_MINT_TTL_MS) {
+      row.token = { ...row.token, ...cached.token };
+    } else {
+      staleMints.push(mint);
+    }
+  }
+
+  if (!staleMints.length) return data;
+
+  const dexMap = new Map<string, any>();
+  for (let i = 0; i < staleMints.length; i += 25) {
+    const batch = staleMints.slice(i, i + 25);
+    try {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) continue;
+      const json = await res.json();
+      const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
+      for (const pair of pairs) {
+        if (pair?.chainId !== "solana") continue;
+        const mint = String(pair?.baseToken?.address || "");
+        if (!MINT_RE.test(mint)) continue;
+        const prev = dexMap.get(mint);
+        const prevLiq = Number(prev?.liquidity?.usd || 0);
+        const nextLiq = Number(pair?.liquidity?.usd || 0);
+        if (!prev || nextLiq > prevLiq) dexMap.set(mint, pair);
+      }
+    } catch {
+      // ignore dex refresh failures
+    }
+  }
+
+  for (const row of hotRows) {
+    const mint = String(row.mint);
+    const pair = dexMap.get(mint);
+    if (!pair) continue;
+    const token = {
+      name: row.token?.name || pair?.baseToken?.name || null,
+      symbol: row.token?.symbol || pair?.baseToken?.symbol || null,
+      image: normalizeImageUrl(row.token?.image || pair?.info?.imageUrl || null),
+      priceUsd: row.token?.priceUsd ?? (pair?.priceUsd ? Number(pair.priceUsd) : null),
+      change24h: pair?.priceChange?.h24 ?? row.token?.change24h ?? null,
+      volume24h: pair?.volume?.h24 ?? row.token?.volume24h ?? null,
+      liquidityUsd: pair?.liquidity?.usd ?? row.token?.liquidityUsd ?? null,
+      marketCapUsd: pair?.marketCap ?? row.token?.marketCapUsd ?? null,
+      fdvUsd: pair?.fdv ?? row.token?.fdvUsd ?? null,
+      pairUrl: pair?.url || row.token?.pairUrl || null,
+      dex: pair?.dexId || row.token?.dex || null,
+    };
+    row.token = { ...row.token, ...token };
+    hotMintCache.set(mint, { at: now, token });
+  }
+
+  return data;
+}
+
 function hydrateWalletProfiles(data: any) {
   const profiles = getWalletProfilesMap();
   if (!profiles.size) return data;
@@ -256,24 +349,26 @@ export async function GET(request: NextRequest) {
       hydratedCache.fingerprint === fp &&
       now - hydratedCache.at < HYDRATE_CACHE_TTL_MS
     ) {
-      return NextResponse.json(hydratedCache.data, {
+      const fast = await applyHotMintFastLane(hydratedCache.data);
+      return NextResponse.json(fast, {
         headers: {
           "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
           "X-Smart-Stale": stale ? "1" : "0",
           "X-Smart-Source": effectiveSource,
-          "X-Smart-Hydrate": "cache",
+          "X-Smart-Hydrate": "cache+hot",
         },
       });
     }
 
     const hydrated = hydrateWalletProfiles(await hydrateTopMintMeta(data));
-    hydratedCache = { at: now, fingerprint: fp, data: hydrated };
-    return NextResponse.json(hydrated, {
+    const fastHydrated = await applyHotMintFastLane(hydrated);
+    hydratedCache = { at: now, fingerprint: fp, data: fastHydrated };
+    return NextResponse.json(fastHydrated, {
       headers: {
         "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
         "X-Smart-Stale": stale ? "1" : "0",
         "X-Smart-Source": effectiveSource,
-        "X-Smart-Hydrate": "fresh",
+        "X-Smart-Hydrate": "fresh+hot",
       },
     });
   } catch (error) {
