@@ -155,6 +155,7 @@ let jupFetchedAt = 0;
 const tokenMetaCache = new Map<string, { at: number; value: TopMint["token"] }>();
 
 const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
+const WALLET_PROFILES_PATH = path.join(process.cwd(), "data", "wallet-profiles.json");
 const FILE_CACHE_PATH = path.join(os.tmpdir(), "smart-wallets-cache.json");
 const KV_CACHE_KEY = "trencher:smart-wallets:snapshot:v1";
 const KV_CACHE_TTL_SECONDS = Number(process.env.SMART_KV_CACHE_TTL_SEC || `${12 * 60 * 60}`);
@@ -172,20 +173,34 @@ function isCompatibleSnapshot(snapshot: any): snapshot is SmartWalletSnapshot {
 }
 
 export function loadWallets(): string[] {
+  const isLikelyWallet = (value: string) => /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(value);
+  const out = new Set<string>();
+
   try {
     const raw = fs.readFileSync(WALLET_PATH, "utf-8");
     const data = JSON.parse(raw) as { wallets?: unknown[] };
-    const wallets: unknown[] = Array.isArray(data.wallets) ? data.wallets : [];
-    return Array.from(
-      new Set(
-        wallets
-          .map((w: unknown) => String(w).trim())
-          .filter((w: string) => w.length > 0),
-      ),
-    );
+    const wallets = Array.isArray(data.wallets) ? data.wallets : [];
+    for (const wallet of wallets) {
+      const value = String(wallet).trim();
+      if (isLikelyWallet(value)) out.add(value);
+    }
   } catch {
-    return [];
+    // ignore
   }
+
+  try {
+    const raw = fs.readFileSync(WALLET_PROFILES_PATH, "utf-8");
+    const data = JSON.parse(raw) as { entries?: Array<{ wallet?: unknown }> };
+    const entries = Array.isArray(data.entries) ? data.entries : [];
+    for (const entry of entries) {
+      const value = String(entry?.wallet || "").trim();
+      if (isLikelyWallet(value)) out.add(value);
+    }
+  } catch {
+    // ignore
+  }
+
+  return Array.from(out);
 }
 
 function rpcUrl() {

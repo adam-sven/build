@@ -46,6 +46,7 @@ const LIVE_APP_URL = process.env.LIVE_APP_URL || process.env.NEXT_PUBLIC_APP_URL
 const WEBHOOK_SECRET = process.env.HELIUS_WEBHOOK_SECRET || "";
 const AUTH_HEADER = WEBHOOK_SECRET ? `Bearer ${WEBHOOK_SECRET}` : "";
 const WALLETS_FILE = path.join(process.cwd(), "data", "smart-wallets.json");
+const WALLET_PROFILES_FILE = path.join(process.cwd(), "data", "wallet-profiles.json");
 
 if (!API_KEY) {
   console.error("[helius-sync] Missing HELIUS_API_KEY");
@@ -65,11 +66,37 @@ function resolveWebhookUrl() {
 }
 
 async function loadWallets() {
-  const raw = await fs.readFile(WALLETS_FILE, "utf8");
-  const json = JSON.parse(raw);
-  const wallets = Array.isArray(json?.wallets) ? json.wallets : [];
-  const deduped = [...new Set(wallets.map((w) => String(w).trim()).filter(Boolean))];
-  if (!deduped.length) throw new Error("No wallets found in data/smart-wallets.json");
+  const isLikelyWallet = (value) => /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(value);
+  const out = new Set();
+
+  try {
+    const raw = await fs.readFile(WALLETS_FILE, "utf8");
+    const json = JSON.parse(raw);
+    const wallets = Array.isArray(json?.wallets) ? json.wallets : [];
+    for (const wallet of wallets) {
+      const value = String(wallet).trim();
+      if (isLikelyWallet(value)) out.add(value);
+    }
+  } catch {
+    // optional source
+  }
+
+  try {
+    const raw = await fs.readFile(WALLET_PROFILES_FILE, "utf8");
+    const json = JSON.parse(raw);
+    const entries = Array.isArray(json?.entries) ? json.entries : [];
+    for (const entry of entries) {
+      const value = String(entry?.wallet || "").trim();
+      if (isLikelyWallet(value)) out.add(value);
+    }
+  } catch {
+    // optional source
+  }
+
+  const deduped = [...out];
+  if (!deduped.length) {
+    throw new Error("No wallets found in data/smart-wallets.json or data/wallet-profiles.json");
+  }
   return deduped;
 }
 
