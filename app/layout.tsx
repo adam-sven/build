@@ -5,6 +5,7 @@ import TrencherNav from '@/components/trencher-nav'
 import TrencherGlobalSearch from "@/components/trencher-global-search";
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
 import ConnectButton from '@/components/wallet/connect-button'
+import LiveStatusBadge from "@/components/trencher/live-status-badge";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 import './globals.css'
@@ -42,6 +43,7 @@ export default function RootLayout({
             </div>
             {children}
           </div>
+          <LiveStatusBadge />
           <footer className="border-t border-white/10 bg-black/70 px-4 py-4 text-xs text-white/60 md:pl-60">
             <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
               <p>Trencher is a filter for attention, not a predictor. Not financial advice.</p>
