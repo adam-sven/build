@@ -30,7 +30,7 @@ function TokenAvatar({ image, symbol }: { image: string | null; symbol: string |
       <img
         src={src}
         alt={symbol || "token"}
-        className="h-8 w-8 rounded-full border border-white/15 object-cover"
+        className="h-6 w-6 rounded-full border border-white/15 object-cover"
         loading="lazy"
         referrerPolicy="no-referrer"
         onError={() => setSrc(null)}
@@ -39,7 +39,7 @@ function TokenAvatar({ image, symbol }: { image: string | null; symbol: string |
   }
 
   return (
-    <div className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px] font-semibold text-white/70">
+    <div className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px] font-semibold text-white/70">
       {(symbol || "T").slice(0, 1).toUpperCase()}
     </div>
   );
@@ -223,7 +223,7 @@ export default function DiscoverClient() {
       </div>
 
       <div className="hidden overflow-hidden rounded-xl border border-white/10 md:block">
-        <div className="grid grid-cols-12 bg-black/40 px-3 py-2 text-[11px] uppercase tracking-wide text-white/50">
+        <div className="grid grid-cols-12 bg-black/40 px-3 py-1.5 text-[10px] uppercase tracking-wide text-white/50">
           <div className="col-span-4">Token</div>
           <div className="col-span-1">Price</div>
           <div className="col-span-1">Txns</div>
@@ -235,14 +235,14 @@ export default function DiscoverClient() {
           <div className="col-span-1">Votes</div>
         </div>
         {filtered.map((item) => (
-          <div key={item.mint} className="grid grid-cols-12 items-center border-t border-white/5 px-3 py-2 text-sm">
+          <div key={item.mint} className="grid grid-cols-12 items-center border-t border-white/5 px-3 py-1 text-xs">
             <div className="col-span-4">
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div className="min-w-0">
-                  <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
-                    <span className="grid h-7 w-7 place-items-center rounded-md bg-black/20">
-                      <SourceIcon source={item.source as SourceFilter} className="h-7 w-7" />
+                  <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-1.5 font-semibold hover:text-emerald-300">
+                    <span className="grid h-5 w-5 place-items-center rounded-md bg-black/20">
+                      <SourceIcon source={item.source as SourceFilter} className="h-5 w-5" />
                     </span>
                     <span className="truncate">
                       {item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span>
@@ -250,7 +250,7 @@ export default function DiscoverClient() {
                   </Link>
                   <button
                     type="button"
-                    className="mt-0.5 block text-left font-mono text-xs text-white/45 hover:text-emerald-300"
+                    className="mt-0.5 block text-left font-mono text-[10px] text-white/45 hover:text-emerald-300"
                     onClick={() => copyMint(item.mint)}
                     title="Copy contract address"
                   >
@@ -259,20 +259,20 @@ export default function DiscoverClient() {
                 </div>
               </div>
             </div>
-            <div className="col-span-1 text-xs">{fmtPrice(item)}</div>
-            <div className="col-span-1 text-xs">{fmtTx(item.txCount24h)}</div>
-            <div className={`col-span-1 text-xs ${pctTone(item.priceChange.m5)}`}>{pct(item.priceChange.m5)}</div>
-            <div className={`col-span-1 text-xs ${pctTone(item.priceChange.h1)}`}>{pct(item.priceChange.h1)}</div>
-            <div className={`col-span-1 text-xs ${pctTone(item.priceChange.h24)}`}>{pct(item.priceChange.h24)}</div>
-            <div className="col-span-1 text-xs">{usd(item.liquidityUsd)}</div>
-            <div className="col-span-1 text-xs">
+            <div className="col-span-1 text-[11px]">{fmtPrice(item)}</div>
+            <div className="col-span-1 text-[11px]">{fmtTx(item.txCount24h)}</div>
+            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.m5)}`}>{pct(item.priceChange.m5)}</div>
+            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.h1)}`}>{pct(item.priceChange.h1)}</div>
+            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.h24)}`}>{pct(item.priceChange.h24)}</div>
+            <div className="col-span-1 text-[11px]">{usd(item.liquidityUsd)}</div>
+            <div className="col-span-1 text-[11px]">
               <AnimatedUsd value={item.marketCapUsd} />
             </div>
-            <div className="col-span-1 text-xs">
+            <div className="col-span-1 text-[11px]">
               <div className="mb-1">{item.votes.score24h}</div>
               <div className="flex gap-1">
-                <Button size="sm" variant="outline" className="h-7 border-white/20 px-2" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>▲</Button>
-                <Button size="sm" variant="outline" className="h-7 border-white/20 px-2" onClick={() => setVoteTarget({ mint: item.mint, direction: "down" })}>▼</Button>
+                <Button size="sm" variant="outline" className="h-6 border-white/20 px-2 text-[10px]" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>▲</Button>
+                <Button size="sm" variant="outline" className="h-6 border-white/20 px-2 text-[10px]" onClick={() => setVoteTarget({ mint: item.mint, direction: "down" })}>▼</Button>
               </div>
             </div>
           </div>
@@ -281,14 +281,14 @@ export default function DiscoverClient() {
 
       <div className="space-y-2 md:hidden">
         {filtered.map((item) => (
-          <div key={item.mint} className="rounded-xl border border-white/10 bg-black/35 p-3">
+          <div key={item.mint} className="rounded-xl border border-white/10 bg-black/35 p-2">
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-2">
                 <TokenAvatar image={item.image} symbol={item.symbol} />
                 <div className="min-w-0">
-                <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-2 font-semibold hover:text-emerald-300">
-                  <span className="grid h-7 w-7 place-items-center rounded-md bg-black/40">
-                    <SourceIcon source={item.source as SourceFilter} className="h-6 w-6" />
+                <Link href={`/intel?mint=${item.mint}`} className="inline-flex items-center gap-1.5 font-semibold hover:text-emerald-300">
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-black/40">
+                    <SourceIcon source={item.source as SourceFilter} className="h-5 w-5" />
                   </span>
                   <span className="truncate">{item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}</span>
                 </Link>
