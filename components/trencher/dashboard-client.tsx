@@ -20,6 +20,12 @@ import {
 type SmartWalletSnapshot = {
   ok: boolean;
   timestamp: string;
+  stats?: {
+    totalWallets: number;
+    activeWallets: number;
+    totalBuys: number;
+    totalTrackedMints: number;
+  };
   topWallets: Array<{
     wallet: string;
     buyCount: number;
@@ -117,6 +123,7 @@ export default function DashboardClient() {
   const [intelLoading, setIntelLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sessionKey = "trencher:dashboard:v1";
+  const smartLocalKey = "trencher:smart:snapshot:persist:v1";
 
   const snapshotRows = (s: SmartWalletSnapshot | null | undefined) =>
     (s?.topWallets?.length || 0) + (s?.topMints?.length || 0);
@@ -135,11 +142,24 @@ export default function DashboardClient() {
 
   const loadDashboard = async (silent = false) => {
     const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null; pump: PumpfunTrendingResponse | null }>(sessionKey);
+    let smartPersisted: SmartWalletSnapshot | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(smartLocalKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as SmartWalletSnapshot;
+          smartPersisted = parsed?.ok ? parsed : null;
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
     if (!silent && !cached?.discover && !cached?.smart && !cached?.pump) setLoading(true);
-    if (!silent && cached) {
-      if (cached.discover?.ok) setDiscover(cached.discover);
-      if (cached.smart?.ok) setSmart(cached.smart);
-      if (cached.pump?.ok) setPump(cached.pump);
+    if (!silent && (cached || smartPersisted)) {
+      if (cached?.discover?.ok) setDiscover(cached.discover);
+      if (cached?.smart?.ok) setSmart(cached.smart);
+      else if (smartPersisted?.ok) setSmart(smartPersisted);
+      if (cached?.pump?.ok) setPump(cached.pump);
     }
     try {
       const [discoverRes, smartRes, pumpRes] = await Promise.allSettled([
@@ -152,7 +172,7 @@ export default function DashboardClient() {
       const pumpJson = pumpRes.status === "fulfilled" ? pumpRes.value : null;
 
       const nextDiscover = discoverJson?.ok ? discoverJson : cached?.discover || null;
-      let nextSmart = smartJson?.ok ? smartJson : cached?.smart || null;
+      let nextSmart = smartJson?.ok ? smartJson : cached?.smart || smartPersisted || null;
       const nextPump = pumpJson?.ok ? pumpJson : cached?.pump || null;
 
       const prevSmart = (cached?.smart?.ok ? cached.smart : smart) || null;
@@ -194,6 +214,13 @@ export default function DashboardClient() {
       }
 
       writeSessionJson(sessionKey, { discover: nextDiscover, smart: nextSmart, pump: nextPump });
+      if (nextSmart?.ok && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(smartLocalKey, JSON.stringify(nextSmart));
+        } catch {
+          // ignore local storage errors
+        }
+      }
     } catch {
       if (!silent) setError("Failed to load dashboard data.");
     } finally {
@@ -217,6 +244,17 @@ export default function DashboardClient() {
     const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null; pump: PumpfunTrendingResponse | null }>(sessionKey);
     if (cached?.discover?.ok) setDiscover(cached.discover);
     if (cached?.smart?.ok) setSmart(cached.smart);
+    else {
+      try {
+        const raw = window.localStorage.getItem(smartLocalKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as SmartWalletSnapshot;
+          if (parsed?.ok) setSmart(parsed);
+        }
+      } catch {
+        // ignore
+      }
+    }
     if (cached?.pump?.ok) setPump(cached.pump);
     loadDashboard();
     const timer = setInterval(() => {
@@ -230,7 +268,8 @@ export default function DashboardClient() {
   const topWallets = useMemo(
     () =>
       (smart?.topWallets || [])
-        .filter((w) => w.buyCount > 0 || Math.abs(w.totalPnlSol ?? w.sampledPnlSol) > 1e-9)
+        .filter((w) => w.buyCount > 0)
+        .filter((w) => Boolean(w.profile?.name || w.profile?.twitter || w.profile?.telegram || w.profile?.website))
         .slice(0, 5),
     [smart],
   );
@@ -261,7 +300,7 @@ export default function DashboardClient() {
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Metric title="Trending tokens" value={String(discover?.items?.length || 0)} />
-        <Metric title="Smart wallets" value={String(smart?.topWallets?.length || 0)} />
+        <Metric title="Smart wallets" value={String(smart?.stats?.totalWallets || smart?.topWallets?.length || 0)} />
         <Metric title="Tracked mints" value={String(smart?.topMints?.length || 0)} />
         <Metric title="Updated" value={smart?.timestamp ? new Date(smart.timestamp).toLocaleTimeString() : "-"} />
       </div>
