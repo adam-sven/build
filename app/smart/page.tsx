@@ -122,22 +122,18 @@ const formatPct = (val: number | null) => {
 };
 
 function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
-  const [ok, setOk] = useState(Boolean(image));
-  if (image && ok) {
+  const [src, setSrc] = useState<string>(image || "/placeholder-logo.svg");
+  if (src) {
     return (
       <img
-        src={image}
+        src={src}
         alt={symbol || "token"}
         className="h-6 w-6 rounded-full border border-white/15 object-cover"
-        onError={() => setOk(false)}
+        onError={() => setSrc("/placeholder-logo.svg")}
       />
     );
   }
-  return (
-    <div className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px]">
-      {(symbol || "T").slice(0, 1)}
-    </div>
-  );
+  return <img src="/placeholder-logo.svg" alt={symbol || "token"} className="h-6 w-6 rounded-full border border-white/15 object-cover" />;
 }
 
 export default function SmartWalletsPage() {

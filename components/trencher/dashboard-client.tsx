@@ -161,7 +161,13 @@ export default function DashboardClient() {
   }, []);
 
   const topTokens = useMemo(() => (discover?.items || []).slice(0, 5), [discover]);
-  const topWallets = useMemo(() => (smart?.topWallets || []).slice(0, 5), [smart]);
+  const topWallets = useMemo(
+    () =>
+      (smart?.topWallets || [])
+        .filter((w) => w.buyCount > 0 || Math.abs(w.totalPnlSol ?? w.sampledPnlSol) > 1e-9)
+        .slice(0, 5),
+    [smart],
+  );
 
   const miniChart = useMemo(() => {
     if (!intel) return [];
@@ -337,22 +343,18 @@ function Metric({ title, value }: { title: string; value: string }) {
 }
 
 function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
-  const [ok, setOk] = useState(Boolean(image));
-  if (image && ok) {
+  const [src, setSrc] = useState<string>(image || "/placeholder-logo.svg");
+  if (src) {
     return (
       <img
-        src={image}
+        src={src}
         alt={symbol || "token"}
         className="h-8 w-8 rounded-full border border-white/15 object-cover"
-        onError={() => setOk(false)}
+        onError={() => setSrc("/placeholder-logo.svg")}
       />
     );
   }
-  return (
-    <div className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px] font-semibold text-white/70">
-      {(symbol || "T").slice(0, 1).toUpperCase()}
-    </div>
-  );
+  return <img src="/placeholder-logo.svg" alt={symbol || "token"} className="h-8 w-8 rounded-full border border-white/15 object-cover" />;
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {

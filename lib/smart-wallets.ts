@@ -128,6 +128,7 @@ const CONCURRENCY = Math.max(1, Math.min(CONCURRENCY_CAP, Number.isFinite(RAW_CO
 const TOKEN_METADATA_LIMIT = 80;
 const TOKEN_METADATA_CONCURRENCY = 8;
 const TOKEN_META_TTL = 10 * 60 * 1000;
+const SNAPSHOT_FALLBACK_WINDOW_MS = Number(process.env.SMART_SNAPSHOT_FALLBACK_WINDOW_MS || `${6 * 60 * 60 * 1000}`);
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const RPC_TIMEOUT_MS = 10_000;
@@ -746,9 +747,26 @@ function isFresh(snapshot: SmartWalletSnapshot): boolean {
 async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   const wallets = loadWallets();
   const activity = await runInBatches(wallets);
+  const previous = readFileCache();
+  const canUsePrevious =
+    previous &&
+    Date.now() - new Date(previous.timestamp).getTime() <= SNAPSHOT_FALLBACK_WINDOW_MS;
+  const previousByWallet = new Map<string, WalletActivity>(
+    (canUsePrevious ? previous.activity : []).map((row) => [row.wallet, row]),
+  );
+  const mergedActivity = activity.map((row) => {
+    const prev = previousByWallet.get(row.wallet);
+    if (!prev) return row;
+    const rowInactive =
+      row.buys.length === 0 &&
+      (!row.positions || row.positions.length === 0) &&
+      (row.totalPnlSol === 0 || !Number.isFinite(row.totalPnlSol));
+    if (!rowInactive) return row;
+    return prev;
+  });
 
   const byMint: Record<string, { walletCount: number; buys: WalletBuy[] }> = {};
-  for (const item of activity) {
+  for (const item of mergedActivity) {
     for (const buy of item.buys) {
       if (!byMint[buy.mint]) byMint[buy.mint] = { walletCount: 0, buys: [] };
       byMint[buy.mint].buys.push(buy);
@@ -778,11 +796,7 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       return b.buyCount - a.buyCount;
     });
 
-  const pnlMints = Array.from(
-    new Set(
-      activity.flatMap((item) => item.positions.map((pos) => pos.mint)),
-    ),
-  );
+  const pnlMints = Array.from(new Set(mergedActivity.flatMap((item) => item.positions.map((pos) => pos.mint))));
   const mintsForMeta = Array.from(
     new Set([
       ...rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => item.mint),
@@ -792,9 +806,10 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   );
   const mintMetaMap = await mapMintMetaWithConcurrency(mintsForMeta);
   const solPriceUsd = await getSolPriceUsd(mintMetaMap);
-  enrichWalletPnL(activity, mintMetaMap, solPriceUsd);
+  enrichWalletPnL(mergedActivity, mintMetaMap, solPriceUsd);
 
-  const topWallets: TopWallet[] = activity
+  const topWallets: TopWallet[] = mergedActivity
+    .filter((item) => item.buys.length > 0 || Math.abs(item.totalPnlSol) > 1e-9)
     .map((item) => ({
       wallet: item.wallet,
       buyCount: item.buys.length,
@@ -844,14 +859,14 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     },
   }));
 
-  const activeWallets = activity.filter((item) => item.buys.length > 0).length;
-  const totalBuys = activity.reduce((sum, item) => sum + item.buys.length, 0);
+  const activeWallets = mergedActivity.filter((item) => item.buys.length > 0).length;
+  const totalBuys = mergedActivity.reduce((sum, item) => sum + item.buys.length, 0);
 
   const snapshot: SmartWalletSnapshot = {
     ok: true,
     timestamp: new Date().toISOString(),
     wallets,
-    activity,
+    activity: mergedActivity,
     byMint,
     topWallets,
     topMints,
