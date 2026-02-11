@@ -167,15 +167,38 @@ export default function SmartWalletsPage() {
   const [walletFilter, setWalletFilter] = useState('');
   const [mintFilter, setMintFilter] = useState('');
   const sessionKey = 'trencher:smart:snapshot:v1';
+  const localKey = "trencher:smart:snapshot:persist:v1";
+
+  const readLocalSnapshot = () => {
+    try {
+      const raw = window.localStorage.getItem(localKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as SmartWalletSnapshot;
+      return parsed?.ok ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeLocalSnapshot = (snapshot: SmartWalletSnapshot | null) => {
+    if (!snapshot?.ok) return;
+    try {
+      window.localStorage.setItem(localKey, JSON.stringify(snapshot));
+    } catch {
+      // ignore
+    }
+  };
 
   const hasSnapshotRows = (snapshot: SmartWalletSnapshot | null) => {
     if (!snapshot) return false;
     return (snapshot.topWallets?.length || 0) + (snapshot.topMints?.length || 0) > 0;
   };
+  const snapshotRowCount = (snapshot: SmartWalletSnapshot | null) =>
+    (snapshot?.topWallets?.length || 0) + (snapshot?.topMints?.length || 0);
 
   useEffect(() => {
     let ignore = false;
-    const cached = readSessionJson<SmartWalletSnapshot>(sessionKey);
+    const cached = readSessionJson<SmartWalletSnapshot>(sessionKey) || readLocalSnapshot();
     const hasCachedRows = hasSnapshotRows(cached);
     if (cached?.ok) {
       setData(cached);
@@ -191,8 +214,12 @@ export default function SmartWalletsPage() {
           setData((prev) => {
             const nextHasRows = hasSnapshotRows(json);
             const prevHasRows = hasSnapshotRows(prev);
-            const next = !nextHasRows && prevHasRows ? prev : json;
+            const nextCount = snapshotRowCount(json);
+            const prevCount = snapshotRowCount(prev);
+            const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
+            const next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
             writeSessionJson(sessionKey, next);
+            writeLocalSnapshot(next);
             return next;
           });
         } else if (!ignore) {
@@ -222,8 +249,12 @@ export default function SmartWalletsPage() {
         setData((prev) => {
           const nextHasRows = hasSnapshotRows(json);
           const prevHasRows = hasSnapshotRows(prev);
-          const next = !nextHasRows && prevHasRows ? prev : json;
+          const nextCount = snapshotRowCount(json);
+          const prevCount = snapshotRowCount(prev);
+          const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
+          const next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
           writeSessionJson(sessionKey, next);
+          writeLocalSnapshot(next);
           return next;
         });
       } else {

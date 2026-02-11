@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { normalizeImageUrl } from "@/lib/utils";
+import { kvGet, kvSet } from "@/lib/trencher/kv";
 
 export type WalletBuy = {
   mint: string;
@@ -140,6 +141,8 @@ const tokenMetaCache = new Map<string, { at: number; value: TopMint["token"] }>(
 
 const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
 const FILE_CACHE_PATH = path.join(os.tmpdir(), "smart-wallets-cache.json");
+const KV_CACHE_KEY = "trencher:smart-wallets:snapshot:v1";
+const KV_CACHE_TTL_SECONDS = Number(process.env.SMART_KV_CACHE_TTL_SEC || `${12 * 60 * 60}`);
 
 function isCompatibleSnapshot(snapshot: any): snapshot is SmartWalletSnapshot {
   if (!snapshot || typeof snapshot !== "object") return false;
@@ -740,6 +743,16 @@ function readFileCache(): SmartWalletSnapshot | null {
   }
 }
 
+async function readKvCache(): Promise<SmartWalletSnapshot | null> {
+  try {
+    const cached = await kvGet<SmartWalletSnapshot>(KV_CACHE_KEY);
+    if (!cached || !cached.ok || !isCompatibleSnapshot(cached)) return null;
+    return cached;
+  } catch {
+    return null;
+  }
+}
+
 function isFresh(snapshot: SmartWalletSnapshot): boolean {
   return Date.now() - new Date(snapshot.timestamp).getTime() < CACHE_TTL;
 }
@@ -884,6 +897,11 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   } catch {
     // ignore
   }
+  try {
+    await kvSet(KV_CACHE_KEY, snapshot, KV_CACHE_TTL_SECONDS);
+  } catch {
+    // ignore
+  }
 
   return snapshot;
 }
@@ -906,7 +924,7 @@ function startBackgroundRefresh() {
 export async function getSmartWalletSnapshot(): Promise<{
   data: SmartWalletSnapshot;
   stale: boolean;
-  source: "memory" | "disk" | "fresh";
+  source: "memory" | "disk" | "kv" | "fresh";
 }> {
   if (cache && isFresh(cache.data)) {
     return { data: cache.data, stale: false, source: "memory" };
@@ -920,6 +938,21 @@ export async function getSmartWalletSnapshot(): Promise<{
       startBackgroundRefresh();
     }
     return { data: diskCached, stale, source: "disk" };
+  }
+
+  const kvCached = await readKvCache();
+  if (kvCached) {
+    cache = { timestamp: Date.now(), data: kvCached };
+    try {
+      fs.writeFileSync(FILE_CACHE_PATH, JSON.stringify(kvCached));
+    } catch {
+      // ignore
+    }
+    const stale = !isFresh(kvCached);
+    if (stale) {
+      startBackgroundRefresh();
+    }
+    return { data: kvCached, stale, source: "kv" };
   }
 
   if (refreshPromise) {
