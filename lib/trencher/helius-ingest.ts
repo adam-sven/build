@@ -80,20 +80,41 @@ const DEFAULT_TTL_SECONDS = Number(process.env.SMART_EVENT_TTL_SEC || `${24 * 36
 const MAX_EVENTS = Number(process.env.SMART_EVENT_MAX || "12000");
 const SNAPSHOT_TTL_SECONDS = Number(process.env.SMART_EVENT_SNAPSHOT_TTL_SEC || "1200");
 const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
+const WALLET_PROFILES_PATH = path.join(process.cwd(), "data", "wallet-profiles.json");
 const SOL_MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,50}$/;
 
 let jupTokenMap: Map<string, any> | null = null;
 let jupFetchedAt = 0;
 
 function loadWatchedWallets(): Set<string> {
+  const out = new Set<string>();
+  const isLikelyWallet = (value: string) => /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(value);
+
   try {
     const raw = fs.readFileSync(WALLET_PATH, "utf-8");
     const parsed = JSON.parse(raw) as { wallets?: unknown[] };
     const list = Array.isArray(parsed.wallets) ? parsed.wallets : [];
-    return new Set(list.map((w) => String(w).trim()).filter(Boolean));
+    for (const wallet of list) {
+      const value = String(wallet).trim();
+      if (isLikelyWallet(value)) out.add(value);
+    }
   } catch {
-    return new Set();
+    // optional source
   }
+
+  try {
+    const raw = fs.readFileSync(WALLET_PROFILES_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as { entries?: Array<{ wallet?: unknown }> };
+    const entries = Array.isArray(parsed.entries) ? parsed.entries : [];
+    for (const entry of entries) {
+      const value = String(entry?.wallet || "").trim();
+      if (isLikelyWallet(value)) out.add(value);
+    }
+  } catch {
+    // optional source
+  }
+
+  return out;
 }
 
 function uniqueBy<T>(arr: T[], key: (v: T) => string): T[] {

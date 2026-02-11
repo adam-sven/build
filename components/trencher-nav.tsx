@@ -28,8 +28,8 @@ export default function TrencherNav() {
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/85 backdrop-blur-xl md:hidden">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-3">
           <Link href="/dashboard" className="flex items-center gap-2 text-base font-semibold text-white">
-            <Image src="/trencher-mark.svg" alt="Trencher" width={20} height={20} className="h-5 w-5" />
-            <span>Trencher</span>
+            <Image src="/trencher-mark.svg" alt="iamtrader.fun" width={20} height={20} className="h-5 w-5" />
+            <span>iamtrader.fun</span>
           </Link>
           <div className="flex items-center gap-2">
             <ConnectButton />
@@ -53,8 +53,8 @@ export default function TrencherNav() {
           >
             <div className="mb-4 flex items-center justify-between">
               <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold text-white" onClick={() => setMobileOpen(false)}>
-                <Image src="/trencher-mark.svg" alt="Trencher" width={18} height={18} className="h-[18px] w-[18px]" />
-                Trencher
+                <Image src="/trencher-mark.svg" alt="iamtrader.fun" width={18} height={18} className="h-[18px] w-[18px]" />
+                iamtrader.fun
               </Link>
             </div>
             <nav className="space-y-1">
@@ -88,8 +88,8 @@ export default function TrencherNav() {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 border-r border-white/10 bg-[#090d14] md:block">
         <div className="flex h-full flex-col p-3">
           <Link href="/dashboard" className="mb-4 flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold text-white">
-            <Image src="/trencher-mark.svg" alt="Trencher" width={18} height={18} className="h-[18px] w-[18px]" />
-            Trencher
+            <Image src="/trencher-mark.svg" alt="iamtrader.fun" width={18} height={18} className="h-[18px] w-[18px]" />
+            iamtrader.fun
           </Link>
           <nav className="space-y-1">
             {LINKS.map((item) => {

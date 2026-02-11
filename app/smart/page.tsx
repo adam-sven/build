@@ -224,7 +224,12 @@ export default function SmartWalletsPage() {
             const nextCount = snapshotRowCount(json);
             const prevCount = snapshotRowCount(prev);
             const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
-            const next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
+            let next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
+            const prevTopMints = Array.isArray(prev?.topMints) ? prev.topMints : [];
+            const nextTopMints = Array.isArray(next?.topMints) ? next.topMints : [];
+            if (prevTopMints.length >= 6 && nextTopMints.length < 3) {
+              next = { ...next, topMints: prevTopMints };
+            }
             writeSessionJson(sessionKey, next);
             writeLocalSnapshot(next);
             return next;
@@ -259,7 +264,12 @@ export default function SmartWalletsPage() {
           const nextCount = snapshotRowCount(json);
           const prevCount = snapshotRowCount(prev);
           const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
-          const next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
+          let next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
+          const prevTopMints = Array.isArray(prev?.topMints) ? prev.topMints : [];
+          const nextTopMints = Array.isArray(next?.topMints) ? next.topMints : [];
+          if (prevTopMints.length >= 6 && nextTopMints.length < 3) {
+            next = { ...next, topMints: prevTopMints };
+          }
           writeSessionJson(sessionKey, next);
           writeLocalSnapshot(next);
           return next;
@@ -296,7 +306,13 @@ export default function SmartWalletsPage() {
   }, [data]);
 
   const wallets = useMemo(() => {
-    const list = (data?.topWallets || []);
+    const list = [...(data?.topWallets || [])].sort((a, b) => {
+      const aPnl = Number.isFinite(Number(a.totalPnlSol)) ? Number(a.totalPnlSol) : Number(a.sampledPnlSol || 0);
+      const bPnl = Number.isFinite(Number(b.totalPnlSol)) ? Number(b.totalPnlSol) : Number(b.sampledPnlSol || 0);
+      if (bPnl !== aPnl) return bPnl - aPnl;
+      if ((b.buyCount || 0) !== (a.buyCount || 0)) return (b.buyCount || 0) - (a.buyCount || 0);
+      return (b.uniqueMints || 0) - (a.uniqueMints || 0);
+    });
     if (!walletFilter.trim()) return list;
     const q = walletFilter.toLowerCase();
     return list.filter((item) => {
@@ -308,6 +324,7 @@ export default function SmartWalletsPage() {
   const topMints = useMemo(() => {
     const list = [...(data?.topMints || [])]
       .filter((item) => isLikelyMint(String(item?.mint || "")))
+      .filter((item) => (item.walletCount || 0) > 1)
       .sort((a, b) => {
         const aChange = typeof a.token?.change24h === "number" && Number.isFinite(a.token.change24h)
           ? a.token.change24h
@@ -458,7 +475,7 @@ export default function SmartWalletsPage() {
                 />
               </div>
               <p className="mt-1 text-xs text-white/50">
-                Showing all tracked wallets. PnL is rolling 24h realized + unrealized SOL estimate.
+                Showing all tracked wallets. Ranked by 24h realized + unrealized SOL estimate (sampled, not lifetime ledger).
               </p>
             </div>
 

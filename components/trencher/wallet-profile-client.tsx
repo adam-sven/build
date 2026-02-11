@@ -125,15 +125,50 @@ function formatTime(sec: number | null) {
 export default function WalletProfileClient({ wallet }: { wallet: string }) {
   const [data, setData] = useState<WalletProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionKey = useMemo(() => `iamtrader:wallet:${wallet}:v1`, [wallet]);
+
+  const hasGoodTokenRows = (snapshot: WalletProfile | null) => {
+    if (!snapshot?.ok || !Array.isArray(snapshot.tokens) || snapshot.tokens.length === 0) return false;
+    return snapshot.tokens.some((t) => {
+      const hasQty = Number(t.qty || 0) > 0.000001;
+      const hasPnl =
+        Math.abs(Number(t.totalPnlSol || 0)) > 0.000001 ||
+        Math.abs(Number(t.realizedPnlSol || 0)) > 0.000001 ||
+        Math.abs(Number(t.unrealizedPnlSol || 0)) > 0.000001;
+      const hasMeta = Number.isFinite(Number(t.token?.priceUsd)) || Number.isFinite(Number(t.token?.marketCapUsd));
+      return hasQty || hasPnl || hasMeta;
+    });
+  };
 
   useEffect(() => {
     let ignore = false;
+    try {
+      const cached = window.sessionStorage.getItem(sessionKey);
+      if (cached) {
+        const parsed = JSON.parse(cached) as WalletProfile;
+        if (parsed?.ok) setData(parsed);
+      }
+    } catch {
+      // ignore
+    }
+
     const load = async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/smart-wallets/wallet/${wallet}`);
         const json = await res.json();
-        if (!ignore && json?.ok) setData(json);
+        if (!ignore && json?.ok) {
+          setData((prev) => {
+            const keepPrev = hasGoodTokenRows(prev) && !hasGoodTokenRows(json);
+            const next = keepPrev ? prev : json;
+            try {
+              if (next?.ok) window.sessionStorage.setItem(sessionKey, JSON.stringify(next));
+            } catch {
+              // ignore
+            }
+            return next;
+          });
+        }
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -142,7 +177,7 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
     return () => {
       ignore = true;
     };
-  }, [wallet]);
+  }, [wallet, sessionKey]);
 
   const topTokens = useMemo(() => (data?.tokens || []).slice(0, 25), [data]);
 

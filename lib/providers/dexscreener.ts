@@ -11,6 +11,7 @@ function parseNumber(v: unknown): number | null {
 }
 
 function intervalToGecko(interval: Interval): { timeframe: "minute" | "hour" | "day"; aggregate: number; limit: number } {
+  if (interval === "1m") return { timeframe: "minute", aggregate: 1, limit: 180 };
   if (interval === "5m") return { timeframe: "minute", aggregate: 5, limit: 120 };
   if (interval === "1h") return { timeframe: "minute", aggregate: 60, limit: 120 };
   if (interval === "24h") return { timeframe: "hour", aggregate: 1, limit: 96 };

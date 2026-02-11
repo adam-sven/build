@@ -3,7 +3,7 @@ import { ok } from "@/lib/trencher/http";
 export async function GET() {
   return ok({
     apiVersion: "v1",
-    name: "Trencher API",
+    name: "IamTrader API",
     auth: {
       header: "X-API-Key",
       limit: "10 requests/min per API key",

@@ -19,6 +19,10 @@ function isWallet(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(value);
 }
 
+function isLikelyMint(value: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
 async function fetchTokenMeta(mint: string) {
   try {
     const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
@@ -69,9 +73,18 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   const score = (activity: any) => {
     if (!activity) return -1;
     const buys = Array.isArray(activity?.buys) ? activity.buys.length : 0;
-    const positions = Array.isArray(activity?.positions) ? activity.positions.length : 0;
+    const positions = Array.isArray(activity?.positions) ? activity.positions : [];
+    const positionCount = positions.length;
+    const nonZeroQty = positions.filter((p: any) => Number(p?.qty || 0) > 0.000001).length;
+    const nonZeroPnl = positions.filter(
+      (p: any) =>
+        Math.abs(Number(p?.realizedPnlSol || 0)) > 0.000001 ||
+        Math.abs(Number(p?.unrealizedPnlSol || 0)) > 0.000001 ||
+        Math.abs(Number(p?.totalPnlSol || 0)) > 0.000001,
+    ).length;
     const pnl = Number(activity?.totalPnlSol || 0);
-    return buys * 3 + positions * 2 + (Math.abs(pnl) > 0 ? 1 : 0);
+    // Prefer snapshots with position quality, then buy depth.
+    return nonZeroPnl * 20 + nonZeroQty * 12 + positionCount * 8 + buys * 2 + (Math.abs(pnl) > 0 ? 3 : 0);
   };
 
   const baseActivity = getWalletActivity(baseSnapshot);
@@ -85,8 +98,15 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   const profile = getWalletProfile(wallet);
 
   const tokenMap = new Map<string, any>();
-  for (const row of data.topMints || []) {
-    tokenMap.set(row.mint, row.token);
+  // Seed from both snapshots to improve token metadata hit-rate.
+  for (const row of (baseSnapshot?.topMints || [])) {
+    if (row?.mint) tokenMap.set(row.mint, row.token);
+  }
+  for (const row of (webhookSnapshot?.topMints || [])) {
+    if (row?.mint && !tokenMap.has(row.mint)) tokenMap.set(row.mint, row.token);
+  }
+  for (const row of (data?.topMints || [])) {
+    if (row?.mint) tokenMap.set(row.mint, row.token);
   }
 
   const byMint = new Map<string, WalletBuy[]>();
@@ -100,8 +120,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   for (const pos of activityAny.positions || []) {
     positionByMint.set(String(pos.mint || ""), pos);
   }
-  const mints = Array.from(new Set([...byMint.keys(), ...positionByMint.keys()]));
-  const missing = mints.filter((mint) => !tokenMap.has(mint)).slice(0, 18);
+  const mints = Array.from(new Set([...byMint.keys(), ...positionByMint.keys()])).filter((mint) => isLikelyMint(mint));
+  const missing = mints.filter((mint) => !tokenMap.has(mint)).slice(0, 24);
   const fetched = await Promise.all(missing.map(async (mint) => [mint, await fetchTokenMeta(mint)] as const));
   for (const [mint, token] of fetched) {
     if (token) tokenMap.set(mint, token);

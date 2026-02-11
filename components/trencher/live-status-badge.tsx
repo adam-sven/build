@@ -92,7 +92,7 @@ export default function LiveStatusBadge() {
       {open && (
         <div className="mb-2 w-[min(92vw,560px)] overflow-hidden rounded-lg border border-emerald-400/20 bg-black/85 shadow-[0_10px_30px_rgba(0,0,0,0.45)] backdrop-blur">
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[11px] text-white/70">
-            <span className="font-mono">trencher/live-terminal</span>
+            <span className="font-mono">iamtrader/live-terminal</span>
             <button
               type="button"
               className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-white/70 hover:text-white"

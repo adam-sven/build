@@ -1,4 +1,4 @@
-export const APP_NAME = "Trencher";
+export const APP_NAME = "IamTrader";
 export const API_VERSION = "v1";
 
 export const TREASURY_PUBKEY =

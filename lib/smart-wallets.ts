@@ -146,6 +146,7 @@ const PNL_WINDOW_SEC = Number(process.env.SMART_PNL_WINDOW_SEC || `${24 * 60 * 6
 const RECENT_BUY_WINDOW_SEC = Number(process.env.SMART_RECENT_BUY_WINDOW_SEC || `${PNL_WINDOW_SEC}`);
 const MIN_KEEP_LIQ_USD = Number(process.env.SMART_MIN_KEEP_LIQ_USD || "2500");
 const MIN_KEEP_VOL_USD = Number(process.env.SMART_MIN_KEEP_VOL_USD || "5000");
+const TOP_MINT_MIN_WALLETS = Math.max(1, Number(process.env.SMART_TOP_MINT_MIN_WALLETS || "2"));
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const RPC_TIMEOUT_MS = 10_000;
@@ -993,6 +994,7 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     });
 
   const topMints: TopMint[] = rankedMints
+    .filter((item) => item.walletCount >= TOP_MINT_MIN_WALLETS)
     .filter((item) => {
       const meta = mintMetaMap.get(item.mint);
       if (!meta) return true;

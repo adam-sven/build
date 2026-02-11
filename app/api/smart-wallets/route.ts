@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildSmartWalletSnapshot, getSmartWalletSnapshot } from "@/lib/smart-wallets";
+import { buildSmartWalletSnapshot, getSmartWalletSnapshot, loadWallets } from "@/lib/smart-wallets";
 import { runLiveRefresh } from "@/lib/trencher/live";
 import { getAssetMetadata } from "@/lib/trencher/helius";
 import {
@@ -19,6 +19,8 @@ let hydratedCache: { at: number; fingerprint: string; data: any } | null = null;
 const MINT_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const HOT_MINT_COUNT = Number(process.env.SMART_HOT_MINT_COUNT || "12");
 const HOT_MINT_TTL_MS = Number(process.env.SMART_HOT_MINT_TTL_MS || "30000");
+const TOP_MINT_MIN_WALLETS = Math.max(1, Number(process.env.SMART_TOP_MINT_MIN_WALLETS || "2"));
+const MIN_TOP_MINT_ROWS = Math.max(3, Number(process.env.SMART_MIN_TOP_MINT_ROWS || "6"));
 const hotMintCache = new Map<
   string,
   {
@@ -295,6 +297,38 @@ function snapshotRows(data: any): number {
   return w + m;
 }
 
+function normalizeSmartLists(data: any) {
+  const topWallets = Array.isArray(data?.topWallets) ? data.topWallets : [];
+  topWallets.sort((a: any, b: any) => {
+    const ap = Number.isFinite(Number(a?.totalPnlSol)) ? Number(a.totalPnlSol) : Number(a?.sampledPnlSol || 0);
+    const bp = Number.isFinite(Number(b?.totalPnlSol)) ? Number(b.totalPnlSol) : Number(b?.sampledPnlSol || 0);
+    if (bp !== ap) return bp - ap;
+    const ab = Number(a?.buyCount || 0);
+    const bb = Number(b?.buyCount || 0);
+    if (bb !== ab) return bb - ab;
+    return Number(b?.uniqueMints || 0) - Number(a?.uniqueMints || 0);
+  });
+
+  const topMints = Array.isArray(data?.topMints) ? data.topMints : [];
+  const filtered = topMints.filter((m: any) => Number(m?.walletCount || 0) >= TOP_MINT_MIN_WALLETS);
+  filtered.sort((a: any, b: any) => {
+    const aChange = Number.isFinite(Number(a?.token?.change24h)) ? Number(a.token.change24h) : null;
+    const bChange = Number.isFinite(Number(b?.token?.change24h)) ? Number(b.token.change24h) : null;
+    if (aChange !== null && bChange !== null && bChange !== aChange) return bChange - aChange;
+    if (bChange !== null && aChange === null) return 1;
+    if (aChange !== null && bChange === null) return -1;
+    if (Number(b?.walletCount || 0) !== Number(a?.walletCount || 0)) {
+      return Number(b?.walletCount || 0) - Number(a?.walletCount || 0);
+    }
+    if (Number(b?.buyCount || 0) !== Number(a?.buyCount || 0)) {
+      return Number(b?.buyCount || 0) - Number(a?.buyCount || 0);
+    }
+    return Number(b?.lastBuyAt || 0) - Number(a?.lastBuyAt || 0);
+  });
+  data.topMints = filtered;
+  return data;
+}
+
 export async function GET(request: NextRequest) {
   const ip = getIp(request);
   if (!isAllowed(ip)) {
@@ -320,12 +354,15 @@ export async function GET(request: NextRequest) {
     }
 
     let cachedWebhook: any | null = null;
+    const expectedWalletCount = loadWallets().length;
     if (webhookMode) {
       cachedWebhook = await getStoredSmartSnapshotFromEvents();
       if (cachedWebhook) {
+        const webhookWalletCount = Number(cachedWebhook?.stats?.totalWallets || 0);
         const hasPnl = Array.isArray((cachedWebhook as any)?.activity)
           && (cachedWebhook as any).activity.some((a: any) => Array.isArray(a?.positions));
-        if (!hasPnl) {
+        if (!hasPnl || webhookWalletCount < expectedWalletCount) {
+          // Rebuild when webhook snapshot is stale/incomplete versus local tracked wallet sources.
           void refreshAndStoreSmartSnapshotFromEvents();
         }
       } else {
@@ -334,7 +371,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: polled, stale, source } = await getSmartWalletSnapshot();
-    const webhookRows = snapshotRows(cachedWebhook);
+    const webhookWalletCount = Number(cachedWebhook?.stats?.totalWallets || 0);
+    const webhookRows =
+      webhookWalletCount >= expectedWalletCount ? snapshotRows(cachedWebhook) : 0;
     const polledRows = snapshotRows(polled);
     const webhookTs = cachedWebhook?.timestamp ? new Date(cachedWebhook.timestamp).getTime() : 0;
     const polledTs = polled?.timestamp ? new Date(polled.timestamp).getTime() : 0;
@@ -360,8 +399,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const hydrated = hydrateWalletProfiles(await hydrateTopMintMeta(data));
+    const hydrated = normalizeSmartLists(hydrateWalletProfiles(await hydrateTopMintMeta(data)));
     const fastHydrated = await applyHotMintFastLane(hydrated);
+    if (
+      hydratedCache &&
+      Array.isArray(fastHydrated?.topMints) &&
+      fastHydrated.topMints.length < MIN_TOP_MINT_ROWS
+    ) {
+      const prevTop = Array.isArray(hydratedCache.data?.topMints) ? hydratedCache.data.topMints : [];
+      if (prevTop.length >= MIN_TOP_MINT_ROWS) {
+        fastHydrated.topMints = prevTop;
+      }
+    }
     hydratedCache = { at: now, fingerprint: fp, data: fastHydrated };
     return NextResponse.json(fastHydrated, {
       headers: {

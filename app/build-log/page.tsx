@@ -13,7 +13,7 @@ export default function Page() {
   const [hasAccess, setHasAccess] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [openEntryId, setOpenEntryId] = useState<number | null>(11);
+  const [openEntryId, setOpenEntryId] = useState<number | null>(null);
 
   // Check token access in one place for easy future SPL token balance check
   const checkAccess = async (wallet: string): Promise<boolean> => {
@@ -723,11 +723,20 @@ export default function Page() {
     }
   ];
 
+  const sortedEntries = useMemo(() => {
+    return [...entries].sort((a, b) => {
+      const aTime = Date.parse(a.date);
+      const bTime = Date.parse(b.date);
+      if (aTime !== bTime) return bTime - aTime;
+      return b.id - a.id;
+    });
+  }, [entries]);
+
   const filteredEntries = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return entries;
+    if (!query) return sortedEntries;
 
-    return entries.filter((entry) => {
+    return sortedEntries.filter((entry) => {
       const haystack = [
         entry.title,
         entry.date,
@@ -742,7 +751,7 @@ export default function Page() {
 
       return haystack.includes(query);
     });
-  }, [entries, searchQuery]);
+  }, [searchQuery, sortedEntries]);
 
   useEffect(() => {
     if (filteredEntries.length === 0) {
@@ -890,7 +899,7 @@ export default function Page() {
               Search logs
             </label>
             <p className="text-xs text-muted-foreground">
-              Showing {filteredEntries.length} of {entries.length}
+              Showing {filteredEntries.length} of {sortedEntries.length}
             </p>
           </div>
           <input

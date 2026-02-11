@@ -14,8 +14,9 @@ const _geist = Geist({ subsets: ['latin'] })
 const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Trencher',
+  title: 'iamtrader.fun',
   description: 'Explainable token discovery. No pay-to-boost.',
+  metadataBase: new URL("https://iamtrader.fun"),
   icons: {
     icon: '/trencher-mark.svg',
   },
@@ -48,7 +49,7 @@ export default function RootLayout({
           <LiveStatusBadge />
           <footer className="border-t border-white/10 bg-black/70 px-3 py-4 text-xs text-white/60 md:pl-60 md:pr-6">
             <div className="flex w-full flex-col gap-2">
-              <p>Trencher is a filter for attention, not a predictor. Not financial advice.</p>
+              <p>iamtrader.fun is a filter for attention, not a predictor. Not financial advice.</p>
               <p>
                 Voting requires 0.001 SOL anti-spam fee to public treasury.{" "}
                 <a

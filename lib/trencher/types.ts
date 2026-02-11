@@ -1,6 +1,6 @@
 export type Chain = "solana" | "ethereum" | "base" | "bsc";
 
-export type Interval = "5m" | "1h" | "24h" | "7d";
+export type Interval = "1m" | "5m" | "1h" | "24h" | "7d";
 
 export type RiskLevel = "low" | "med" | "high" | "unknown";
 

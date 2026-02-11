@@ -45,7 +45,7 @@ export async function createChallenge(params: {
   const action = params.kind === "vote" ? "vote" : "submit";
   const directionText = params.direction ? `\nDirection: ${params.direction}` : "";
   const messageToSign = [
-    "Trencher Challenge",
+    "IamTrader Challenge",
     `Action: ${action}`,
     `Wallet: ${params.wallet}`,
     `Chain: ${params.chain}`,

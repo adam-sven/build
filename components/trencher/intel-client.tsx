@@ -18,7 +18,7 @@ import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import { Globe, Twitter } from "lucide-react";
 import NativeCandleChart from "@/components/trencher/native-candle-chart";
 
-const intervals: Interval[] = ["5m", "1h", "24h", "7d"];
+const intervals: Interval[] = ["1m", "5m", "1h", "24h", "7d"];
 
 function fmtUsd(v: number | null) {
   if (v === null) return "-";
@@ -44,6 +44,7 @@ function short(v: string) {
 }
 
 function gmgnInterval(interval: Interval): string {
+  if (interval === "1m") return "1";
   if (interval === "5m") return "5";
   if (interval === "1h") return "60";
   if (interval === "24h") return "240";
@@ -73,7 +74,7 @@ function buildTraderLinks(mint: string, pairUrl: string | null): TraderLink[] {
 export default function IntelClient({ initialMint }: { initialMint: string }) {
   const router = useRouter();
   const [mint, setMint] = useState(initialMint || "");
-  const [interval, setChartInterval] = useState<Interval>("1h");
+  const [interval, setChartInterval] = useState<Interval>("1m");
   const [data, setData] = useState<TokenResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [voteDirection, setVoteDirection] = useState<"up" | "down" | null>(null);
@@ -229,7 +230,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
             const chartSeries = nativePoints;
             const gmgnSrc = `https://www.gmgn.cc/kline/sol/${data.mint}?interval=${encodeURIComponent(
               gmgnInterval(interval),
-            )}&theme=dark`;
+            )}&theme=dark&chartType=line`;
             return (
               <>
           <section className="rounded-xl border border-white/10 bg-black/30 p-4">
@@ -354,9 +355,11 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               <div>Vol <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.volume24hUsd)}</span></div>
             </div>
             <div className="relative h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
-              <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-[11px] text-white/75">
-                {data.identity.symbol || "TOKEN"} • {fmtUsd(data.market.priceUsd)} • 5m {fmtPct(data.market.priceChange.m5)} • 1h {fmtPct(data.market.priceChange.h1)} • 24h {fmtPct(data.market.priceChange.h24)}
-              </div>
+              {chartSource === "native" && (
+                <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-[11px] text-white/75">
+                  {data.identity.symbol || "TOKEN"} • {fmtUsd(data.market.priceUsd)} • 5m {fmtPct(data.market.priceChange.m5)} • 1h {fmtPct(data.market.priceChange.h1)} • 24h {fmtPct(data.market.priceChange.h24)}
+                </div>
+              )}
               {chartSource === "gmgn" && (
                 <iframe
                   key={`${data.mint}:${interval}`}
