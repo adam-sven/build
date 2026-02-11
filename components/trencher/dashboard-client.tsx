@@ -110,8 +110,8 @@ export default function DashboardClient() {
     }
     try {
       const [discoverRes, smartRes] = await Promise.allSettled([
-        fetchJsonWithTimeout("/api/ui/discover?chain=solana&mode=trending", 8_000),
-        fetchJsonWithTimeout("/api/smart-wallets", 8_000),
+        fetchJsonWithTimeout("/api/ui/discover?chain=solana&mode=trending", silent ? 8_000 : 20_000),
+        fetchJsonWithTimeout("/api/smart-wallets", silent ? 8_000 : 20_000),
       ]);
       const discoverJson = discoverRes.status === "fulfilled" ? discoverRes.value : null;
       const smartJson = smartRes.status === "fulfilled" ? smartRes.value : null;

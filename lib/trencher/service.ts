@@ -244,9 +244,9 @@ function isDiscoverEligible(token: TokenResponse, mode: DiscoverMode): boolean {
 }
 
 export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promise<DiscoverResponse> {
-  const cached = await getCachedFeed<DiscoverResponse>(chain, mode);
+  const cached = await getCachedFeed<DiscoverResponse>(chain, mode, { preferNonEmpty: true });
   if (cached) return cached;
-  const staleCached = await getCachedFeed<DiscoverResponse>(chain, mode, { allowStale: true });
+  const staleCached = await getCachedFeed<DiscoverResponse>(chain, mode, { allowStale: true, preferNonEmpty: true });
 
   const lockKey = `trencher:lock:discover:${chain}:${mode}`;
   const gotLock = await kvSetNx(lockKey, "1", 25);
@@ -296,13 +296,25 @@ export async function buildDiscoverFeed(chain: Chain, mode: DiscoverMode): Promi
     if (mode === "new") sorted = [...scored].sort((a, b) => +new Date(b.token.updatedAt) - +new Date(a.token.updatedAt));
 
     const tokenByMint = new Map(sorted.map((x) => [x.token.mint, x.token] as const));
-    const items = sorted
+    let items = sorted
       .map((x) => toRow(x.token, x.score))
       .filter((row) => {
         const token = tokenByMint.get(row.mint);
         return token ? isDiscoverEligible(token, mode) : false;
       })
       .slice(0, 100);
+
+    if (items.length === 0) {
+      if (staleCached?.items?.length) {
+        return staleCached;
+      }
+
+      // Soft fallback to avoid blank feeds when strict filters or provider gaps temporarily eliminate all rows.
+      items = sorted
+        .map((x) => toRow(x.token, x.score))
+        .filter((row) => (row.liquidityUsd || 0) >= 2_000 || (row.volume24hUsd || 0) >= 5_000)
+        .slice(0, 40);
+    }
 
     for (let i = 0; i < items.length; i += 1) {
       const row = items[i];

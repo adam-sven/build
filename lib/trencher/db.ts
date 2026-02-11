@@ -463,21 +463,39 @@ export async function getTokenPeak(chain: Chain, mint: string): Promise<{ peakRa
 }
 
 export async function cacheFeed(chain: Chain, mode: string, feed: any, ttlSeconds = 120) {
-  await Promise.all([
+  const hasItems = Array.isArray(feed?.items) && feed.items.length > 0;
+  const writes: Promise<any>[] = [
     kvSet(`trencher:feed:${chain}:${mode}`, feed, ttlSeconds),
     kvSet(`trencher:feed:stale:${chain}:${mode}`, feed, Math.max(600, ttlSeconds * 5)),
-  ]);
+  ];
+  if (hasItems) {
+    writes.push(
+      kvSet(`trencher:feed:nonempty:${chain}:${mode}`, feed, Math.max(900, ttlSeconds * 8)),
+      kvSet(`trencher:feed:stale_nonempty:${chain}:${mode}`, feed, Math.max(1800, ttlSeconds * 12)),
+    );
+  }
+  await Promise.all(writes);
 }
 
 export async function getCachedFeed<T>(
   chain: Chain,
   mode: string,
-  options?: { allowStale?: boolean },
+  options?: { allowStale?: boolean; preferNonEmpty?: boolean },
 ): Promise<T | null> {
+  const hasItems = (v: any) => Array.isArray(v?.items) && v.items.length > 0;
   const fresh = await kvGet<T>(`trencher:feed:${chain}:${mode}`);
-  if (fresh) return fresh;
+  if (fresh && (!options?.preferNonEmpty || hasItems(fresh))) return fresh;
+  if (options?.preferNonEmpty) {
+    const nonEmptyFresh = await kvGet<T>(`trencher:feed:nonempty:${chain}:${mode}`);
+    if (nonEmptyFresh && hasItems(nonEmptyFresh)) return nonEmptyFresh;
+  }
   if (options?.allowStale) {
-    return kvGet<T>(`trencher:feed:stale:${chain}:${mode}`);
+    const stale = await kvGet<T>(`trencher:feed:stale:${chain}:${mode}`);
+    if (stale && (!options?.preferNonEmpty || hasItems(stale))) return stale;
+    if (options?.preferNonEmpty) {
+      const nonEmptyStale = await kvGet<T>(`trencher:feed:stale_nonempty:${chain}:${mode}`);
+      if (nonEmptyStale && hasItems(nonEmptyStale)) return nonEmptyStale;
+    }
   }
   return null;
 }

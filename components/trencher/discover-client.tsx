@@ -97,7 +97,7 @@ export default function DiscoverClient() {
       const res = await fetch(`/api/ui/discover?chain=solana&mode=${m}`);
       const json: DiscoverResponse = await res.json();
       if (json?.ok) {
-        setItems(json.items);
+        setItems((prev) => (json.items?.length === 0 && prev.length > 0 ? prev : json.items));
         writeSessionJson(`trencher:discover:${m}:v1`, json);
       }
     } finally {
