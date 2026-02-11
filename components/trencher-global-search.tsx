@@ -24,8 +24,8 @@ export default function TrencherGlobalSearch() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-4 py-2 md:px-6">
-      <div className="relative w-full max-w-2xl">
+    <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2 md:px-6">
+      <div className="relative w-full md:max-w-2xl">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/45" />
         <input
           value={q}
@@ -34,13 +34,13 @@ export default function TrencherGlobalSearch() {
             if (e.key === "Enter") runSearch();
           }}
           placeholder="Search token (mint/symbol/name) or wallet (address/name)"
-          className="h-8 w-full rounded-lg border border-white/10 bg-black/45 pl-7 pr-2 text-xs text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/30"
+          className="h-9 w-full rounded-lg border border-white/10 bg-black/45 pl-7 pr-2 text-xs text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/30"
         />
       </div>
       <button
         type="button"
         onClick={runSearch}
-        className="h-8 rounded-lg bg-emerald-400 px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-60"
+        className="h-9 rounded-lg bg-emerald-400 px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-60"
         disabled={loading}
       >
         {loading ? "..." : "Search"}
@@ -48,4 +48,3 @@ export default function TrencherGlobalSearch() {
     </div>
   );
 }
-

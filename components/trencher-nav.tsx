@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3, FileText, LayoutDashboard, Search, Shield, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import ConnectButton from "@/components/wallet/connect-button";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,14 +30,17 @@ export default function TrencherNav() {
             <Image src="/trencher-mark.svg" alt="Trencher" width={20} height={20} className="h-5 w-5" />
             <span>Trencher</span>
           </Link>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-8 border-white/20 px-2 text-xs"
-            onClick={() => setMobileOpen((v) => !v)}
-          >
-            Menu
-          </Button>
+          <div className="flex items-center gap-2">
+            <ConnectButton />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 border-white/20 px-2 text-xs"
+              onClick={() => setMobileOpen((v) => !v)}
+            >
+              Menu
+            </Button>
+          </div>
         </div>
       </header>
 

@@ -36,7 +36,7 @@ export default function RootLayout({
               Ranking is driven by community votes, search interest, and market quality - not payments.
             </div>
             <div className="border-b border-white/10 bg-black/25">
-              <div className="mx-auto flex w-full max-w-7xl justify-end px-4 pt-2 md:px-6">
+              <div className="mx-auto hidden w-full max-w-7xl justify-end px-4 pt-2 md:flex md:px-6">
                 <ConnectButton />
               </div>
               <TrencherGlobalSearch />
