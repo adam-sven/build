@@ -34,16 +34,19 @@ export async function POST(request: NextRequest) {
 
   const events = parseHeliusWebhookEvents(payload);
   const stored = await storeWalletEvents(events);
-  const snapshot = await refreshAndStoreSmartSnapshotFromEvents();
+  const buildInline = /^(1|true|yes)$/i.test(process.env.HELIUS_INGEST_BUILD_INLINE || "");
+  if (buildInline) {
+    await refreshAndStoreSmartSnapshotFromEvents();
+  } else {
+    void refreshAndStoreSmartSnapshotFromEvents().catch(() => undefined);
+  }
 
   return NextResponse.json({
     ok: true,
     parsed: events.length,
     stored: stored.stored,
     totalEvents: stored.total,
-    snapshotBuilt: Boolean(snapshot),
-    activeWallets: snapshot?.stats?.activeWallets ?? 0,
-    trackedMints: snapshot?.stats?.totalTrackedMints ?? 0,
+    snapshotBuildQueued: !buildInline,
     timestamp: new Date().toISOString(),
   });
 }
