@@ -193,29 +193,47 @@ function rpcUrl() {
   return key ? `https://mainnet.helius-rpc.com/?api-key=${key}` : "https://api.mainnet-beta.solana.com";
 }
 
+function rpcUrls(): string[] {
+  const urls: string[] = [];
+  const primary = process.env.SOLANA_RPC_URL?.trim();
+  if (primary) urls.push(primary);
+  const helius = rpcUrl();
+  if (helius) urls.push(helius);
+  urls.push("https://api.mainnet-beta.solana.com");
+  return Array.from(new Set(urls.filter((u) => !!u)));
+}
+
 async function rpc(method: string, params: unknown[]) {
   let lastError: unknown = null;
+  const urls = rpcUrls();
   for (let attempt = 0; attempt <= RPC_RETRIES; attempt += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), RPC_TIMEOUT_MS);
-    try {
-      const res = await fetch(rpcUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: method, method, params }),
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      if (!res.ok) {
-        throw new Error(`RPC ${method} failed (${res.status})`);
+    for (const url of urls) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), RPC_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: method, method, params }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          throw new Error(`RPC ${method} failed (${res.status}) via ${url}`);
+        }
+        const json = await res.json();
+        if (json?.error) {
+          const msg = json.error?.message || "unknown rpc error";
+          throw new Error(`RPC ${method} error via ${url}: ${msg}`);
+        }
+        return json;
+      } catch (error) {
+        clearTimeout(timer);
+        lastError = error;
       }
-      return await res.json();
-    } catch (error) {
-      clearTimeout(timer);
-      lastError = error;
-      if (attempt < RPC_RETRIES) {
-        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
-      }
+    }
+    if (attempt < RPC_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
     }
   }
   throw lastError ?? new Error(`RPC ${method} failed`);
