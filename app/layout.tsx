@@ -6,6 +6,7 @@ import TrencherGlobalSearch from "@/components/trencher-global-search";
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
 import ConnectButton from '@/components/wallet/connect-button'
 import LiveStatusBadge from "@/components/trencher/live-status-badge";
+import ThemeToggle from "@/components/theme-toggle";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 import './globals.css'
@@ -31,13 +32,16 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <SolanaWalletProvider>
           <TrencherNav />
-          <div className="min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-20%,#0d1f34_0%,transparent_55%),radial-gradient(900px_500px_at_90%_-10%,#06251c_0%,transparent_55%),#04060a] text-white md:pl-56">
+          <div className="trencher-shell min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-20%,#0d1f34_0%,transparent_55%),radial-gradient(900px_500px_at_90%_-10%,#06251c_0%,transparent_55%),#04060a] text-white md:pl-56">
             <div className="border-b border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-center text-xs font-medium text-emerald-200 md:px-6">
               Ranking is driven by community votes, search interest, and market quality - not payments.
             </div>
             <div className="border-b border-white/10 bg-black/25">
               <div className="hidden w-full justify-end px-3 pt-2 md:flex md:px-6">
-                <ConnectButton />
+                <div className="flex items-center gap-2">
+                  <ThemeToggle />
+                  <ConnectButton />
+                </div>
               </div>
               <TrencherGlobalSearch />
             </div>

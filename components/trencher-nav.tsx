@@ -7,6 +7,7 @@ import { BarChart3, FileText, LayoutDashboard, Search, Shield, Wallet } from "lu
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import ConnectButton from "@/components/wallet/connect-button";
+import ThemeToggle from "@/components/theme-toggle";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -31,6 +32,7 @@ export default function TrencherNav() {
             <span>Trencher</span>
           </Link>
           <div className="flex items-center gap-2">
+            <ThemeToggle compact />
             <ConnectButton />
             <Button
               type="button"

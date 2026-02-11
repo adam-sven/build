@@ -153,3 +153,43 @@ body {
   background: rgba(255, 255, 255, 0.08) !important;
   color: rgba(241, 245, 249, 0.8) !important;
 }
+
+/* Light mode skin */
+:root.trencher-light {
+  color-scheme: light;
+}
+
+:root.trencher-light body {
+  background: #f5f7fb !important;
+  color: #0f172a !important;
+}
+
+:root.trencher-light .trencher-shell {
+  background: radial-gradient(1200px 600px at 10% -20%, rgba(59, 130, 246, 0.12) 0%, transparent 55%),
+    radial-gradient(900px 500px at 90% -10%, rgba(16, 185, 129, 0.12) 0%, transparent 55%),
+    #f8fafc !important;
+  color: #0f172a !important;
+}
+
+:root.trencher-light [class*="bg-black"],
+:root.trencher-light [class*="bg-[#090d14]"],
+:root.trencher-light [class*="bg-[#090d13]"] {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+:root.trencher-light [class*="border-white"] {
+  border-color: rgba(15, 23, 42, 0.14) !important;
+}
+
+:root.trencher-light [class*="text-white"] {
+  color: rgba(15, 23, 42, 0.9) !important;
+}
+
+:root.trencher-light [class*="text-cyan-300"],
+:root.trencher-light [class*="text-emerald-300"] {
+  color: rgb(5 150 105) !important;
+}
+
+:root.trencher-light [class*="text-red-300"] {
+  color: rgb(220 38 38) !important;
+}
