@@ -134,10 +134,9 @@ function TokenAvatar({ image, symbol, mint }: { image: string | null; symbol: st
     image || "",
     `https://cdn.dexscreener.com/tokens/solana/${mint}.png`,
     `https://dd.dexscreener.com/ds-data/tokens/solana/${mint}.png`,
-    "/placeholder-logo.svg",
   ].filter(Boolean);
   const [idx, setIdx] = useState(0);
-  const src = candidates[Math.min(idx, candidates.length - 1)];
+  const src = idx < candidates.length ? candidates[idx] : null;
 
   useEffect(() => {
     setIdx(0);
@@ -151,11 +150,15 @@ function TokenAvatar({ image, symbol, mint }: { image: string | null; symbol: st
         className="h-6 w-6 rounded-full border border-white/15 object-cover"
         loading="lazy"
         referrerPolicy="no-referrer"
-        onError={() => setIdx((v) => Math.min(v + 1, candidates.length - 1))}
+        onError={() => setIdx((v) => v + 1)}
       />
     );
   }
-  return <img src="/placeholder-logo.svg" alt={symbol || "token"} className="h-6 w-6 rounded-full border border-white/15 object-cover" />;
+  return (
+    <div className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px] font-semibold text-white/75">
+      {(symbol || mint || "T").slice(0, 1).toUpperCase()}
+    </div>
+  );
 }
 
 export default function SmartWalletsPage() {

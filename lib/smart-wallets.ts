@@ -130,6 +130,9 @@ const TOKEN_METADATA_LIMIT = 80;
 const TOKEN_METADATA_CONCURRENCY = 8;
 const TOKEN_META_TTL = 10 * 60 * 1000;
 const SNAPSHOT_FALLBACK_WINDOW_MS = Number(process.env.SMART_SNAPSHOT_FALLBACK_WINDOW_MS || `${6 * 60 * 60 * 1000}`);
+const RECENT_BUY_WINDOW_SEC = Number(process.env.SMART_RECENT_BUY_WINDOW_SEC || `${6 * 60 * 60}`);
+const MIN_KEEP_LIQ_USD = Number(process.env.SMART_MIN_KEEP_LIQ_USD || "2500");
+const MIN_KEEP_VOL_USD = Number(process.env.SMART_MIN_KEEP_VOL_USD || "5000");
 const WSOL_MINT = "So11111111111111111111111111111111111111112";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const RPC_TIMEOUT_MS = 10_000;
@@ -791,25 +794,88 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     byMint[mint].walletCount = uniqueWallets.size;
   }
 
-  const rankedMints = Object.entries(byMint)
-    .map(([mint, value]) => ({
+  const pnlMints = Array.from(new Set(mergedActivity.flatMap((item) => item.positions.map((pos) => pos.mint))));
+  const nowSec = Math.floor(Date.now() / 1000);
+  type MintAggregate = {
+    mint: string;
+    walletSet: Set<string>;
+    recentWalletSet: Set<string>;
+    openWalletSet: Set<string>;
+    buys: WalletBuy[];
+    amountTotal: number;
+    solFlow: number;
+    lastBuyAt: number;
+    lastTradeAt: number;
+    openQty: number;
+  };
+  const aggByMint = new Map<string, MintAggregate>();
+  const getAgg = (mint: string): MintAggregate => {
+    const hit = aggByMint.get(mint);
+    if (hit) return hit;
+    const next: MintAggregate = {
       mint,
-      walletCount: value.walletCount,
-      buyCount: value.buys.length,
-      wallets: Array.from(new Set(value.buys.map((b) => b.wallet))),
-      amountTotal: value.buys.reduce((sum, buy) => sum + (buy.amount || 0), 0),
-      solFlow: value.buys.reduce((sum, buy) => sum + (buy.solDelta || 0), 0),
-      lastBuyAt: value.buys.reduce((latest, buy) => {
-        const ts = buy.blockTime || 0;
-        return ts > latest ? ts : latest;
-      }, 0),
+      walletSet: new Set<string>(),
+      recentWalletSet: new Set<string>(),
+      openWalletSet: new Set<string>(),
+      buys: [],
+      amountTotal: 0,
+      solFlow: 0,
+      lastBuyAt: 0,
+      lastTradeAt: 0,
+      openQty: 0,
+    };
+    aggByMint.set(mint, next);
+    return next;
+  };
+
+  for (const item of mergedActivity) {
+    for (const buy of item.buys) {
+      const agg = getAgg(buy.mint);
+      agg.walletSet.add(item.wallet);
+      if (buy.blockTime && buy.blockTime >= nowSec - RECENT_BUY_WINDOW_SEC) {
+        agg.recentWalletSet.add(item.wallet);
+      }
+      agg.buys.push(buy);
+      agg.amountTotal += buy.amount || 0;
+      agg.solFlow += buy.solDelta || 0;
+      const bts = buy.blockTime || 0;
+      if (bts > agg.lastBuyAt) agg.lastBuyAt = bts;
+      if (bts > agg.lastTradeAt) agg.lastTradeAt = bts;
+    }
+    for (const pos of item.positions || []) {
+      const agg = getAgg(pos.mint);
+      if ((pos.qty || 0) > 0.000001) {
+        agg.openWalletSet.add(item.wallet);
+        agg.openQty += pos.qty || 0;
+      }
+      const pts = pos.lastTradeAt || 0;
+      if (pts > agg.lastTradeAt) agg.lastTradeAt = pts;
+    }
+  }
+
+  const rankedMints = Array.from(aggByMint.values())
+    .map((agg) => ({
+      mint: agg.mint,
+      walletCount: agg.walletSet.size,
+      recentWalletCount: agg.recentWalletSet.size,
+      openWalletCount: agg.openWalletSet.size,
+      buyCount: agg.buys.length,
+      wallets: Array.from(agg.walletSet),
+      amountTotal: agg.amountTotal,
+      solFlow: agg.solFlow,
+      lastBuyAt: agg.lastBuyAt,
+      lastTradeAt: agg.lastTradeAt,
+      openQty: agg.openQty,
     }))
+    .filter((row) => row.openWalletCount > 0 || row.recentWalletCount > 0 || row.buyCount >= 2)
     .sort((a, b) => {
+      if (b.openWalletCount !== a.openWalletCount) return b.openWalletCount - a.openWalletCount;
+      if (b.recentWalletCount !== a.recentWalletCount) return b.recentWalletCount - a.recentWalletCount;
       if (b.walletCount !== a.walletCount) return b.walletCount - a.walletCount;
-      return b.buyCount - a.buyCount;
+      if (b.buyCount !== a.buyCount) return b.buyCount - a.buyCount;
+      return b.lastTradeAt - a.lastTradeAt;
     });
 
-  const pnlMints = Array.from(new Set(mergedActivity.flatMap((item) => item.positions.map((pos) => pos.mint))));
   const mintsForMeta = Array.from(
     new Set([
       ...rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => item.mint),
@@ -849,28 +915,39 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       return b.uniqueMints - a.uniqueMints;
     });
 
-  const topMints: TopMint[] = rankedMints.slice(0, TOKEN_METADATA_LIMIT).map((item) => ({
-    mint: item.mint,
-    walletCount: item.walletCount,
-    buyCount: item.buyCount,
-    wallets: item.wallets,
-    amountTotal: item.amountTotal,
-    solFlow: item.solFlow,
-    lastBuyAt: item.lastBuyAt || null,
-    token: mintMetaMap.get(item.mint) || {
-      name: null,
-      symbol: null,
-      image: null,
-      priceUsd: null,
-      change24h: null,
-      volume24h: null,
-      liquidityUsd: null,
-      marketCapUsd: null,
-      fdvUsd: null,
-      pairUrl: null,
-      dex: null,
-    },
-  }));
+  const topMints: TopMint[] = rankedMints
+    .filter((item) => {
+      const meta = mintMetaMap.get(item.mint);
+      if (!meta) return true;
+      const liq = meta.liquidityUsd || 0;
+      const vol = meta.volume24h || 0;
+      const staleNoPosition = item.openWalletCount === 0 && item.recentWalletCount === 0;
+      if (staleNoPosition && liq < MIN_KEEP_LIQ_USD && vol < MIN_KEEP_VOL_USD) return false;
+      return true;
+    })
+    .slice(0, TOKEN_METADATA_LIMIT)
+    .map((item) => ({
+      mint: item.mint,
+      walletCount: item.walletCount,
+      buyCount: item.buyCount,
+      wallets: item.wallets,
+      amountTotal: item.amountTotal,
+      solFlow: item.solFlow,
+      lastBuyAt: item.lastBuyAt || null,
+      token: mintMetaMap.get(item.mint) || {
+        name: null,
+        symbol: null,
+        image: null,
+        priceUsd: null,
+        change24h: null,
+        volume24h: null,
+        liquidityUsd: null,
+        marketCapUsd: null,
+        fdvUsd: null,
+        pairUrl: null,
+        dex: null,
+      },
+    }));
 
   const activeWallets = mergedActivity.filter((item) => item.buys.length > 0).length;
   const totalBuys = mergedActivity.reduce((sum, item) => sum + item.buys.length, 0);
