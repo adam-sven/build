@@ -274,8 +274,27 @@ export default function SmartWalletsPage() {
     return map;
   }, [data]);
 
+  const tokenMetaByMint = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        name: string | null;
+        symbol: string | null;
+      }
+    >();
+    for (const item of data?.topMints || []) {
+      map.set(item.mint, {
+        name: item.token?.name || null,
+        symbol: item.token?.symbol || null,
+      });
+    }
+    return map;
+  }, [data]);
+
   const wallets = useMemo(() => {
-    const list = (data?.topWallets || []).filter((item) => item.buyCount > 0);
+    const list = (data?.topWallets || [])
+      .filter((item) => item.buyCount > 0)
+      .filter((item) => Boolean(item.profile?.name || item.profile?.twitter || item.profile?.telegram || item.profile?.website));
     if (!walletFilter.trim()) return list;
     const q = walletFilter.toLowerCase();
     return list.filter((item) => {
@@ -444,9 +463,14 @@ export default function SmartWalletsPage() {
                           <ul className="mt-2 space-y-1 text-xs text-white/70">
                             {details.buys.slice(0, 8).map((buy) => (
                               <li key={`${buy.signature}-${buy.mint}`} className="grid grid-cols-[1fr_auto_auto] gap-2">
-                                <span className="font-mono">
-                                  {shortAddr(buy.mint, 6, 6)}
-                                  {buy.source === 'holding' ? ' (holding)' : ''}
+                                <span className="font-mono min-w-0">
+                                  <span className="mr-1 text-white/85">
+                                    {tokenMetaByMint.get(buy.mint)?.symbol || tokenMetaByMint.get(buy.mint)?.name || "Token"}
+                                  </span>
+                                  <Link href={`/intel?mint=${buy.mint}`} className="text-cyan-300 hover:text-cyan-200">
+                                    {shortAddr(buy.mint, 6, 6)}
+                                  </Link>
+                                  {buy.source === 'holding' ? <span className="text-white/40"> (holding)</span> : null}
                                 </span>
                                 <span>{formatShort(buy.amount)}</span>
                                 <span className="text-white/40">{formatBlockTime(buy.blockTime)}</span>
