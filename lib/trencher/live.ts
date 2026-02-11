@@ -5,6 +5,7 @@ import type { Chain, DiscoverMode } from "@/lib/trencher/types";
 import { refreshAndStoreSmartSnapshotFromEvents } from "@/lib/trencher/helius-ingest";
 
 type LiveScope = "discover" | "smart" | "all";
+const LOW_CREDIT_MODE = /^(1|true|yes)$/i.test(process.env.SMART_LOW_CREDIT_MODE || "");
 
 const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
   trending: 12_000,
@@ -12,7 +13,7 @@ const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
   new: 45_000,
   quality: 60_000,
 };
-const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || "7200000");
+const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || (LOW_CREDIT_MODE ? "21600000" : "7200000"));
 const LIVE_LOCK_KEY = "trencher:live:refresh:lock";
 
 const DISCOVER_AT_KEY = (chain: Chain, mode: DiscoverMode) => `trencher:live:discover:at:${chain}:${mode}`;

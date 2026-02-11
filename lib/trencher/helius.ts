@@ -1,7 +1,10 @@
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { normalizeImageUrl } from "@/lib/utils";
-const HOLDER_STATS_TTL_MS = Number(process.env.HOLDER_STATS_TTL_MS || `${15 * 60 * 1000}`);
-const HOLDER_COUNT_MAX_PAGES = Number(process.env.HOLDER_COUNT_MAX_PAGES || "3");
+const LOW_CREDIT_MODE = /^(1|true|yes)$/i.test(process.env.SMART_LOW_CREDIT_MODE || "");
+const HOLDER_STATS_TTL_MS = Number(
+  process.env.HOLDER_STATS_TTL_MS || (LOW_CREDIT_MODE ? `${60 * 60 * 1000}` : `${15 * 60 * 1000}`),
+);
+const HOLDER_COUNT_MAX_PAGES = Number(process.env.HOLDER_COUNT_MAX_PAGES || (LOW_CREDIT_MODE ? "1" : "3"));
 const holderStatsCache = new Map<
   string,
   {

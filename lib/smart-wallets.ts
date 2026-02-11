@@ -110,10 +110,20 @@ const CACHE_TTL = Number(process.env.SMART_CACHE_TTL_MS || `${10 * 60 * 1000}`);
 let cache: { timestamp: number; data: SmartWalletSnapshot } | null = null;
 let refreshPromise: Promise<SmartWalletSnapshot> | null = null;
 
+const LOW_CREDIT_MODE = /^(1|true|yes)$/i.test(process.env.SMART_LOW_CREDIT_MODE || "");
 const HAS_HELIUS = Boolean(process.env.HELIUS_API_KEY);
-const RAW_SIGNATURES_LIMIT = Number(process.env.SMART_SIGNATURES_LIMIT || (HAS_HELIUS ? "120" : "40"));
-const RAW_MAX_TX_PER_WALLET = Number(process.env.SMART_MAX_TX_PER_WALLET || (HAS_HELIUS ? "80" : "20"));
-const RAW_CONCURRENCY = Number(process.env.SMART_RPC_CONCURRENCY || (HAS_HELIUS ? "3" : "2"));
+const RAW_SIGNATURES_LIMIT = Number(
+  process.env.SMART_SIGNATURES_LIMIT ||
+    (LOW_CREDIT_MODE ? "30" : HAS_HELIUS ? "120" : "40"),
+);
+const RAW_MAX_TX_PER_WALLET = Number(
+  process.env.SMART_MAX_TX_PER_WALLET ||
+    (LOW_CREDIT_MODE ? "12" : HAS_HELIUS ? "80" : "20"),
+);
+const RAW_CONCURRENCY = Number(
+  process.env.SMART_RPC_CONCURRENCY ||
+    (LOW_CREDIT_MODE ? "1" : HAS_HELIUS ? "3" : "2"),
+);
 const MAX_SIG_CAP = HAS_HELIUS ? 400 : 80;
 const MAX_TX_CAP = HAS_HELIUS ? 200 : 40;
 const CONCURRENCY_CAP = HAS_HELIUS ? 8 : 3;
@@ -126,8 +136,10 @@ const MAX_TX_PER_WALLET = Math.max(
   ),
 );
 const CONCURRENCY = Math.max(1, Math.min(CONCURRENCY_CAP, Number.isFinite(RAW_CONCURRENCY) ? Math.floor(RAW_CONCURRENCY) : (HAS_HELIUS ? 3 : 2)));
-const TOKEN_METADATA_LIMIT = 80;
-const TOKEN_METADATA_CONCURRENCY = 8;
+const TOKEN_METADATA_LIMIT = Number(process.env.SMART_TOKEN_METADATA_LIMIT || (LOW_CREDIT_MODE ? "40" : "80"));
+const TOKEN_METADATA_CONCURRENCY = Number(
+  process.env.SMART_TOKEN_METADATA_CONCURRENCY || (LOW_CREDIT_MODE ? "4" : "8"),
+);
 const TOKEN_META_TTL = 10 * 60 * 1000;
 const SNAPSHOT_FALLBACK_WINDOW_MS = Number(process.env.SMART_SNAPSHOT_FALLBACK_WINDOW_MS || `${6 * 60 * 60 * 1000}`);
 const RECENT_BUY_WINDOW_SEC = Number(process.env.SMART_RECENT_BUY_WINDOW_SEC || `${6 * 60 * 60}`);
@@ -146,6 +158,9 @@ const WALLET_PATH = path.join(process.cwd(), "data", "smart-wallets.json");
 const FILE_CACHE_PATH = path.join(os.tmpdir(), "smart-wallets-cache.json");
 const KV_CACHE_KEY = "trencher:smart-wallets:snapshot:v1";
 const KV_CACHE_TTL_SECONDS = Number(process.env.SMART_KV_CACHE_TTL_SEC || `${12 * 60 * 60}`);
+const ENABLE_HOLDINGS_FALLBACK = /^(1|true|yes)$/i.test(
+  process.env.SMART_ENABLE_HOLDINGS_FALLBACK || (LOW_CREDIT_MODE ? "false" : "true"),
+);
 
 function isCompatibleSnapshot(snapshot: any): snapshot is SmartWalletSnapshot {
   if (!snapshot || typeof snapshot !== "object") return false;
@@ -424,7 +439,7 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
     }
   }
 
-  if (buys.length === 0) {
+  if (ENABLE_HOLDINGS_FALLBACK && buys.length === 0) {
     try {
       buys.push(...(await getWalletHoldings(wallet)));
     } catch {

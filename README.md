@@ -34,10 +34,14 @@ REDIS_URL=
 REDIS_TLS=true
 API_KEYS=key1,key2
 INTERNAL_API_KEY=
-SMART_REFRESH_MS=300000
+SMART_REFRESH_MS=7200000
 SMART_SIGNATURES_LIMIT=120
 SMART_MAX_TX_PER_WALLET=80
 SMART_RPC_CONCURRENCY=3
+SMART_LOW_CREDIT_MODE=false
+SMART_ENABLE_HOLDINGS_FALLBACK=true
+SMART_TOKEN_METADATA_LIMIT=80
+SMART_TOKEN_METADATA_CONCURRENCY=8
 SMART_CACHE_TTL_MS=600000
 SMART_HYDRATE_TTL_MS=120000
 SMART_USE_WEBHOOK_EVENTS=true
@@ -53,6 +57,35 @@ NEXT_PUBLIC_APP_URL=
 NEXT_PUBLIC_TREASURY_PUBKEY=CSJc1VcNJUHJHj199sVSa8XJ66rvEpf4sHbpeQj7N6vA
 NEXT_PUBLIC_VOTE_FEE_LAMPORTS=1000000
 NEXT_PUBLIC_SUBMIT_FEE_LAMPORTS=10000000
+```
+
+### Low-credit mode (Helius cost saver)
+
+Set:
+
+```bash
+SMART_LOW_CREDIT_MODE=true
+```
+
+This changes defaults to cheaper values unless you explicitly override env vars:
+
+- fewer signatures per wallet scan
+- fewer transactions parsed per wallet
+- lower RPC concurrency
+- lower token metadata fanout
+- holdings fallback disabled by default
+- slower smart refresh cadence
+- holder stats cached longer, fewer holder pages scanned
+
+Recommended starting overrides with low-credit mode:
+
+```bash
+SMART_SIGNATURES_LIMIT=30
+SMART_MAX_TX_PER_WALLET=12
+SMART_RPC_CONCURRENCY=1
+SMART_REFRESH_MS=21600000
+HOLDER_COUNT_MAX_PAGES=1
+HOLDER_STATS_TTL_MS=3600000
 ```
 
 ## Database migration
@@ -78,6 +111,11 @@ Public agent endpoints (require `X-API-Key`):
 UI proxy endpoints:
 
 - `/api/ui/*`
+
+Ops endpoint:
+
+- `GET /api/ops/cache-health`
+- Uses `OPS_SECRET` (or `LIVE_TICK_SECRET`) when configured.
 
 Cron endpoint (protected):
 
