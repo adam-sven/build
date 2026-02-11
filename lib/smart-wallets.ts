@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { normalizeImageUrl } from "@/lib/utils";
-import { kvGet, kvSet } from "@/lib/trencher/kv";
+import { kvGet, kvIncr, kvSet } from "@/lib/trencher/kv";
 
 export type WalletBuy = {
   mint: string;
@@ -761,6 +761,7 @@ function isFresh(snapshot: SmartWalletSnapshot): boolean {
 }
 
 async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
+  void kvIncr("trencher:metrics:smart_snapshot_build_total", 60 * 60 * 24 * 30).catch(() => undefined);
   const wallets = loadWallets();
   const activity = await runInBatches(wallets);
   const previous = readFileCache();
@@ -978,6 +979,7 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       prevRows >= 20 &&
       nextRows < Math.max(8, Math.floor(prevRows * 0.45));
     if (hardEmptyDrop || severeCollapse) {
+      void kvIncr("trencher:metrics:smart_snapshot_guard_reused_previous_total", 60 * 60 * 24 * 30).catch(() => undefined);
       cache = { timestamp: Date.now(), data: previous };
       return previous;
     }
@@ -1019,6 +1021,7 @@ export async function getSmartWalletSnapshot(): Promise<{
   source: "memory" | "disk" | "kv" | "fresh";
 }> {
   if (cache && isFresh(cache.data)) {
+    void kvIncr("trencher:metrics:smart_snapshot_source:memory", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data: cache.data, stale: false, source: "memory" };
   }
 
@@ -1029,6 +1032,7 @@ export async function getSmartWalletSnapshot(): Promise<{
     if (stale) {
       startBackgroundRefresh();
     }
+    void kvIncr("trencher:metrics:smart_snapshot_source:disk", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data: diskCached, stale, source: "disk" };
   }
 
@@ -1044,11 +1048,13 @@ export async function getSmartWalletSnapshot(): Promise<{
     if (stale) {
       startBackgroundRefresh();
     }
+    void kvIncr("trencher:metrics:smart_snapshot_source:kv", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data: kvCached, stale, source: "kv" };
   }
 
   if (refreshPromise) {
     const data = await refreshPromise;
+    void kvIncr("trencher:metrics:smart_snapshot_source:fresh", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data, stale: false, source: "fresh" };
   }
 
@@ -1056,5 +1062,6 @@ export async function getSmartWalletSnapshot(): Promise<{
     refreshPromise = null;
   });
   const data = await refreshPromise;
+  void kvIncr("trencher:metrics:smart_snapshot_source:fresh", 60 * 60 * 24 * 30).catch(() => undefined);
   return { data, stale: false, source: "fresh" };
 }
