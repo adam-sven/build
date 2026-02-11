@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import AnimatedUsd from "@/components/trencher/animated-usd";
 
 type WalletProfile = {
   ok: boolean;
@@ -222,6 +223,7 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
                   </div>
                   <div className="text-xs text-white/70">
                     <div>Price: {usd(item.token.priceUsd)}</div>
+                    <div>MC: <AnimatedUsd value={item.token.marketCapUsd} /></div>
                     <div>PnL: <span className={item.totalPnlSol >= 0 ? "text-emerald-300" : "text-red-300"}>{sol(item.totalPnlSol)}</span></div>
                   </div>
                   <div className="text-xs text-white/70">

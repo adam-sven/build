@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import AnimatedUsd from "@/components/trencher/animated-usd";
 import type { DiscoverResponse, TokenResponse } from "@/lib/trencher/types";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import {
@@ -297,7 +298,7 @@ export default function DashboardClient() {
                   <div className={item.priceChange.h24 && item.priceChange.h24 > 0 ? "text-emerald-300" : "text-red-300"}>
                     {pct(item.priceChange.h24)}
                   </div>
-                  <div className="text-white/55">MC {usd(item.marketCapUsd)}</div>
+                  <div className="text-white/55">MC <AnimatedUsd value={item.marketCapUsd} /></div>
                   <div className="text-white/45">Vol {usd(item.volume24hUsd)}</div>
                 </div>
               </Link>
@@ -415,7 +416,7 @@ export default function DashboardClient() {
                   </div>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/70">
-                  <div>MC {usd(item.marketCapUsd)}</div>
+                  <div>MC <AnimatedUsd value={item.marketCapUsd} /></div>
                   <div>Vol {usd(item.volume24hUsd)}</div>
                 </div>
                 <div className="mt-1 text-xs">

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
+import AnimatedUsd from '@/components/trencher/animated-usd';
 import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
 type WalletBuy = {
@@ -592,7 +593,7 @@ export default function SmartWalletsPage() {
                             <span className="ml-1 text-white/45">{token.token.name || shortAddr(token.mint, 6, 6)}</span>
                           </div>
                           <div className="mt-0.5 truncate text-[11px] text-white/55">
-                            {token.walletCount}w • {token.buyCount}b • MCap {formatUsd(token.token.marketCapUsd)} • Vol {formatUsd(token.token.volume24h)} • Liq {formatUsd(token.token.liquidityUsd)}
+                            {token.walletCount}w • {token.buyCount}b • MCap <AnimatedUsd value={token.token.marketCapUsd} /> • Vol {formatUsd(token.token.volume24h)} • Liq {formatUsd(token.token.liquidityUsd)}
                           </div>
                         </div>
                         <div className={`text-sm font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>

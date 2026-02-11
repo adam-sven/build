@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AnimatedUsd from "@/components/trencher/animated-usd";
 import type { DiscoverMode, DiscoverResponse, TokenRowSummary } from "@/lib/trencher/types";
 import VoteModal from "@/components/trencher/vote-modal";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
@@ -264,7 +265,9 @@ export default function DiscoverClient() {
             <div className={`col-span-1 text-xs ${pctTone(item.priceChange.h1)}`}>{pct(item.priceChange.h1)}</div>
             <div className={`col-span-1 text-xs ${pctTone(item.priceChange.h24)}`}>{pct(item.priceChange.h24)}</div>
             <div className="col-span-1 text-xs">{usd(item.liquidityUsd)}</div>
-            <div className="col-span-1 text-xs">{usd(item.marketCapUsd)}</div>
+            <div className="col-span-1 text-xs">
+              <AnimatedUsd value={item.marketCapUsd} />
+            </div>
             <div className="col-span-1 text-xs">
               <div className="mb-1">{item.votes.score24h}</div>
               <div className="flex gap-1">
@@ -305,7 +308,7 @@ export default function DiscoverClient() {
               <div>Price {fmtPrice(item)}</div>
               <div>Liq {usd(item.liquidityUsd)}</div>
               <div>Vol {usd(item.volume24hUsd)}</div>
-              <div>MC {usd(item.marketCapUsd)}</div>
+              <div>MC <AnimatedUsd value={item.marketCapUsd} /></div>
               <div className={pctTone(item.priceChange.m5)}>5m {pct(item.priceChange.m5)}</div>
               <div className={pctTone(item.priceChange.h1)}>1h {pct(item.priceChange.h1)}</div>
               <div className={pctTone(item.priceChange.h24)}>24h {pct(item.priceChange.h24)}</div>

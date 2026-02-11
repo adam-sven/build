@@ -23,6 +23,8 @@ function formatAgo(ms: number) {
 export default function LiveStatusBadge() {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [status, setStatus] = useState<LiveStatus | null>(null);
+  const [open, setOpen] = useState(false);
+  const [lines, setLines] = useState<string[]>([]);
 
   useEffect(() => {
     let dead = false;
@@ -37,6 +39,13 @@ export default function LiveStatusBadge() {
         if (dead) return;
         setLatencyMs(Math.max(1, Math.round(t1 - t0)));
         setStatus(json);
+        const now = Date.now();
+        const ageSec = json.updatedAt ? Math.max(0, Math.floor((now - json.updatedAt) / 1000)) : -1;
+        const smartSec = json.smartAt ? Math.max(0, Math.floor((now - json.smartAt) / 1000)) : -1;
+        const discoverSec = json.discoverAt ? Math.max(0, Math.floor((now - json.discoverAt) / 1000)) : -1;
+        const stamp = new Date(now).toLocaleTimeString();
+        const row = `[${stamp}] ping=${Math.max(1, Math.round(t1 - t0))}ms updated=${ageSec >= 0 ? `${ageSec}s` : "na"} smart=${smartSec >= 0 ? `${smartSec}s` : "na"} discover=${discoverSec >= 0 ? `${discoverSec}s` : "na"}`;
+        setLines((prev) => [...prev.slice(-13), row]);
       } catch {
         // ignore
       }
@@ -79,15 +88,39 @@ export default function LiveStatusBadge() {
     : "no data yet";
 
   return (
-    <div className="pointer-events-none fixed bottom-3 right-3 z-[85] md:bottom-4 md:right-4">
-      <div className={`rounded-lg border px-3 py-1.5 text-xs font-medium shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur ${tone}`}>
+    <div className="fixed bottom-3 right-3 z-[85] md:bottom-4 md:right-4">
+      {open && (
+        <div className="mb-2 w-[min(92vw,560px)] overflow-hidden rounded-lg border border-emerald-400/20 bg-black/85 shadow-[0_10px_30px_rgba(0,0,0,0.45)] backdrop-blur">
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[11px] text-white/70">
+            <span className="font-mono">trencher/live-terminal</span>
+            <button
+              type="button"
+              className="rounded border border-white/15 px-2 py-0.5 text-[10px] text-white/70 hover:text-white"
+              onClick={() => setOpen(false)}
+            >
+              close
+            </button>
+          </div>
+          <div className="max-h-44 overflow-y-auto px-3 py-2 font-mono text-[11px] leading-5 text-emerald-200/90">
+            {(lines.length ? lines : ["[boot] waiting for first status tick..."]).map((line, i) => (
+              <div key={`${line}-${i}`}>{line}</div>
+            ))}
+          </div>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`rounded-lg border px-3 py-1.5 text-xs font-medium shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur ${tone}`}
+      >
         <span className="inline-flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-current opacity-90" />
           <span>{label}</span>
           <span>{latencyMs ? `${latencyMs}ms` : "--ms"}</span>
           <span>{ageLabel}</span>
+          <span className="rounded border border-white/20 px-1.5 py-0.5 text-[10px] text-white/85">terminal</span>
         </span>
-      </div>
+      </button>
     </div>
   );
 }

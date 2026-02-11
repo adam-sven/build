@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AnimatedUsd from "@/components/trencher/animated-usd";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -396,7 +397,14 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
 
           <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
             <Stat title="Price" value={fmtUsd(data.market.priceUsd)} />
-            <Stat title="Market Cap/FDV" value={`${fmtUsd(data.market.marketCapUsd)} / ${fmtUsd(data.market.fdvUsd)}`} />
+            <Stat
+              title="Market Cap/FDV"
+              value={
+                <span>
+                  <AnimatedUsd value={data.market.marketCapUsd} /> / <AnimatedUsd value={data.market.fdvUsd} />
+                </span>
+              }
+            />
             <Stat title="Liquidity" value={fmtUsd(data.market.liquidityUsd)} />
             <Stat title="Volume 24h" value={fmtUsd(data.market.volume24hUsd)} />
             <Stat title="Tx 24h" value={String(data.market.txCount24h || "-")} />
@@ -466,7 +474,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   );
 }
 
-function Stat({ title, value }: { title: string; value: string }) {
+function Stat({ title, value }: { title: string; value: ReactNode }) {
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 p-3">
       <div className="text-xs uppercase tracking-wide text-white/50">{title}</div>
