@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { kvGet } from "@/lib/trencher/kv";
-import Redis from "ioredis";
+import { hasRedisConfig, makeRedisClient } from "@/lib/trencher/redis";
 
 const SMART_SNAPSHOT_KEY = "trencher:smart-wallets:snapshot:v1";
 const LIVE_SMART_AT_KEY = "trencher:live:smart:at";
@@ -69,32 +69,35 @@ export async function GET(request: NextRequest) {
     error: null,
   };
 
-  const redisUrl = process.env.REDIS_URL || "";
-  if (redisUrl) {
-    const client = new Redis(redisUrl, {
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableReadyCheck: true,
-      tls: redisUrl.startsWith("rediss://") ? {} : undefined,
-    });
-    try {
-      await client.connect();
-      const [ping, exists] = await Promise.all([client.ping(), client.exists(SMART_SNAPSHOT_KEY)]);
-      redisHealth = {
-        reachable: true,
-        ping: ping || null,
-        snapshotKeyExists: exists === 1,
-        error: null,
-      };
-    } catch (error: any) {
+  if (hasRedisConfig()) {
+    const client = makeRedisClient();
+    if (!client) {
       redisHealth = {
         reachable: false,
         ping: null,
         snapshotKeyExists: null,
-        error: error?.message || "redis check failed",
+        error: "redis client init failed",
       };
-    } finally {
-      await client.quit().catch(() => undefined);
+    } else {
+      try {
+        await client.connect();
+        const [ping, exists] = await Promise.all([client.ping(), client.exists(SMART_SNAPSHOT_KEY)]);
+        redisHealth = {
+          reachable: true,
+          ping: ping || null,
+          snapshotKeyExists: exists === 1,
+          error: null,
+        };
+      } catch (error: any) {
+        redisHealth = {
+          reachable: false,
+          ping: null,
+          snapshotKeyExists: null,
+          error: error?.message || "redis check failed",
+        };
+      } finally {
+        await client.quit().catch(() => undefined);
+      }
     }
   }
 
@@ -102,7 +105,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     now: new Date().toISOString(),
     infra: {
-      redisConfigured: Boolean(process.env.REDIS_URL),
+      redisConfigured: hasRedisConfig(),
       vercelKvConfigured: Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN),
       heliusConfigured: Boolean(process.env.HELIUS_API_KEY),
       redisHealth,

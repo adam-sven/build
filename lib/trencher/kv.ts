@@ -1,5 +1,6 @@
 import { kv } from "@vercel/kv";
 import Redis from "ioredis";
+import { makeRedisClient } from "@/lib/trencher/redis";
 
 type MemoryValue = { value: string; expiresAt: number | null };
 const memory = new Map<string, MemoryValue>();
@@ -12,22 +13,14 @@ function getRedis() {
   redisInitTried = true;
 
   const url = process.env.REDIS_URL;
-  if (!url) return null;
+  if (!url && !(process.env.REDIS_HOST && process.env.REDIS_PORT)) return null;
 
-  try {
-    redisClient = new Redis(url, {
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      enableReadyCheck: true,
-      tls: url.startsWith("rediss://") ? {} : undefined,
-    });
-    redisClient.on("error", () => {
-      // Keep silent and allow fallback tiers.
-    });
-    return redisClient;
-  } catch {
-    return null;
-  }
+  redisClient = makeRedisClient();
+  if (!redisClient) return null;
+  redisClient.on("error", () => {
+    // Keep silent and allow fallback tiers.
+  });
+  return redisClient;
 }
 
 function hasKv() {
