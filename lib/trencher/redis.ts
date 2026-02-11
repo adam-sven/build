@@ -22,7 +22,8 @@ export function makeRedisClient(): Redis | null {
       return new Redis(url, {
         lazyConnect: true,
         maxRetriesPerRequest: 1,
-        enableReadyCheck: true,
+        enableReadyCheck: false,
+        family: 4,
         tls: useTls ? {} : undefined,
       });
     }
@@ -34,7 +35,8 @@ export function makeRedisClient(): Redis | null {
       password,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
-      enableReadyCheck: true,
+      enableReadyCheck: false,
+      family: 4,
       tls: useTls ? {} : undefined,
     });
   } catch {
