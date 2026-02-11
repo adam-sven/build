@@ -775,16 +775,41 @@ function isFresh(snapshot: SmartWalletSnapshot): boolean {
   return Date.now() - new Date(snapshot.timestamp).getTime() < CACHE_TTL;
 }
 
+function snapshotRowCount(snapshot: SmartWalletSnapshot | null | undefined): number {
+  if (!snapshot) return 0;
+  return (snapshot.topWallets?.length || 0) + (snapshot.topMints?.length || 0);
+}
+
+async function readBestPreviousSnapshot(): Promise<SmartWalletSnapshot | null> {
+  const candidates: SmartWalletSnapshot[] = [];
+  if (cache?.data && isCompatibleSnapshot(cache.data)) candidates.push(cache.data);
+  const kvCached = await readKvCache();
+  if (kvCached) candidates.push(kvCached);
+  const diskCached = readFileCache();
+  if (diskCached) candidates.push(diskCached);
+  if (!candidates.length) return null;
+
+  candidates.sort((a, b) => {
+    const rowsDiff = snapshotRowCount(b) - snapshotRowCount(a);
+    if (rowsDiff !== 0) return rowsDiff;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
+  return candidates[0] || null;
+}
+
 async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   void kvIncr("trencher:metrics:smart_snapshot_build_total", 60 * 60 * 24 * 30).catch(() => undefined);
   const wallets = loadWallets();
-  const activity = await runInBatches(wallets);
-  const previous = readFileCache();
+  const previous = await readBestPreviousSnapshot();
+  const previousRows = snapshotRowCount(previous);
+  const previousTopWallets = previous?.topWallets?.length || 0;
   const canUsePrevious =
-    previous &&
+    !!previous &&
+    previousRows > 0 &&
     Date.now() - new Date(previous.timestamp).getTime() <= SNAPSHOT_FALLBACK_WINDOW_MS;
+  const activity = await runInBatches(wallets);
   const previousByWallet = new Map<string, WalletActivity>(
-    (canUsePrevious ? previous.activity : []).map((row) => [row.wallet, row]),
+    (canUsePrevious ? (previous?.activity || []) : []).map((row) => [row.wallet, row]),
   );
   const mergedActivity = activity.map((row) => {
     const prev = previousByWallet.get(row.wallet);
@@ -984,20 +1009,23 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     },
   };
 
-  if (canUsePrevious) {
-    const prevRows = (previous.topWallets?.length || 0) + (previous.topMints?.length || 0);
-    const nextRows = (snapshot.topWallets?.length || 0) + (snapshot.topMints?.length || 0);
-    const prevTopWallets = previous.topWallets?.length || 0;
-    const nextTopWallets = snapshot.topWallets?.length || 0;
-    const hardEmptyDrop = prevTopWallets > 0 && nextTopWallets === 0;
+  const nextRows = snapshotRowCount(snapshot);
+  const nextTopWallets = snapshot.topWallets?.length || 0;
+  if (canUsePrevious && previous) {
+    const hardEmptyDrop = previousTopWallets > 0 && nextTopWallets === 0;
+    const totalEmptyDrop = previousRows > 0 && nextRows === 0;
     const severeCollapse =
-      prevRows >= 20 &&
-      nextRows < Math.max(8, Math.floor(prevRows * 0.45));
-    if (hardEmptyDrop || severeCollapse) {
+      previousRows >= 20 &&
+      nextRows < Math.max(8, Math.floor(previousRows * 0.45));
+    if (hardEmptyDrop || totalEmptyDrop || severeCollapse) {
       void kvIncr("trencher:metrics:smart_snapshot_guard_reused_previous_total", 60 * 60 * 24 * 30).catch(() => undefined);
       cache = { timestamp: Date.now(), data: previous };
       return previous;
     }
+  }
+
+  if (nextRows === 0) {
+    return snapshot;
   }
 
   cache = { timestamp: Date.now(), data: snapshot };
@@ -1036,23 +1064,20 @@ export async function getSmartWalletSnapshot(): Promise<{
   source: "memory" | "disk" | "kv" | "fresh";
 }> {
   if (cache && isFresh(cache.data)) {
+    if (snapshotRowCount(cache.data) === 0) {
+      const kvCached = await readKvCache();
+      if (kvCached && snapshotRowCount(kvCached) > 0) {
+        cache = { timestamp: Date.now(), data: kvCached };
+        void kvIncr("trencher:metrics:smart_snapshot_source:kv", 60 * 60 * 24 * 30).catch(() => undefined);
+        return { data: kvCached, stale: !isFresh(kvCached), source: "kv" };
+      }
+    }
     void kvIncr("trencher:metrics:smart_snapshot_source:memory", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data: cache.data, stale: false, source: "memory" };
   }
 
-  const diskCached = readFileCache();
-  if (diskCached) {
-    cache = { timestamp: Date.now(), data: diskCached };
-    const stale = !isFresh(diskCached);
-    if (stale) {
-      startBackgroundRefresh();
-    }
-    void kvIncr("trencher:metrics:smart_snapshot_source:disk", 60 * 60 * 24 * 30).catch(() => undefined);
-    return { data: diskCached, stale, source: "disk" };
-  }
-
   const kvCached = await readKvCache();
-  if (kvCached) {
+  if (kvCached && snapshotRowCount(kvCached) > 0) {
     cache = { timestamp: Date.now(), data: kvCached };
     try {
       fs.writeFileSync(FILE_CACHE_PATH, JSON.stringify(kvCached));
@@ -1065,6 +1090,17 @@ export async function getSmartWalletSnapshot(): Promise<{
     }
     void kvIncr("trencher:metrics:smart_snapshot_source:kv", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data: kvCached, stale, source: "kv" };
+  }
+
+  const diskCached = readFileCache();
+  if (diskCached && snapshotRowCount(diskCached) > 0) {
+    cache = { timestamp: Date.now(), data: diskCached };
+    const stale = !isFresh(diskCached);
+    if (stale) {
+      startBackgroundRefresh();
+    }
+    void kvIncr("trencher:metrics:smart_snapshot_source:disk", 60 * 60 * 24 * 30).catch(() => undefined);
+    return { data: diskCached, stale, source: "disk" };
   }
 
   if (refreshPromise) {
