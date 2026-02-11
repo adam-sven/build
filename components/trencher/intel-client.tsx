@@ -14,16 +14,8 @@ import {
 import VoteModal from "@/components/trencher/vote-modal";
 import type { Interval, TokenResponse } from "@/lib/trencher/types";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Globe, Twitter } from "lucide-react";
+import NativeCandleChart from "@/components/trencher/native-candle-chart";
 
 const intervals: Interval[] = ["5m", "1h", "24h", "7d"];
 
@@ -60,10 +52,6 @@ function gmgnInterval(interval: Interval): string {
 function normalizeTsSeconds(t: number): number {
   if (!Number.isFinite(t)) return 0;
   return t > 10_000_000_000 ? Math.floor(t / 1000) : Math.floor(t);
-}
-
-function fmtChartTime(tsSec: number) {
-  return new Date(tsSec * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 type TraderLink = { label: string; url: string };
@@ -379,54 +367,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 />
               )}
               {chartSource === "native" && chartSeries.length > 1 && (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartSeries} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-                    <defs>
-                      <linearGradient id="nativeChartFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.45} />
-                        <stop offset="95%" stopColor="#34d399" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#16303a" strokeDasharray="4 4" />
-                    <XAxis
-                      dataKey="t"
-                      type="number"
-                      domain={["dataMin", "dataMax"]}
-                      tickFormatter={(v) => fmtChartTime(Number(v))}
-                      minTickGap={28}
-                      tick={{ fill: "#8fa3b4", fontSize: 11 }}
-                    />
-                    <YAxis
-                      tick={{ fill: "#8fa3b4", fontSize: 11 }}
-                      width={76}
-                      tickFormatter={(v) => Number(v).toFixed(6)}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "#05070c",
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: "8px",
-                        color: "#e5eef6",
-                      }}
-                      labelFormatter={(v) => fmtChartTime(Number(v))}
-                      formatter={(value: number, name: string) => {
-                        if (name === "close") return [`$${Number(value).toFixed(8)}`, "Close"];
-                        if (name === "open") return [`$${Number(value).toFixed(8)}`, "Open"];
-                        if (name === "high") return [`$${Number(value).toFixed(8)}`, "High"];
-                        if (name === "low") return [`$${Number(value).toFixed(8)}`, "Low"];
-                        return [Number(value).toFixed(2), "Volume"];
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="close"
-                      stroke="#34d399"
-                      strokeWidth={2}
-                      fill="url(#nativeChartFill)"
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <NativeCandleChart symbol={data.identity.symbol || "TOKEN"} data={chartSeries} />
               )}
               {chartSource === "native" && chartSeries.length <= 1 && (
                 <div className="grid h-full place-items-center px-6 text-center text-sm text-white/60">
