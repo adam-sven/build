@@ -84,7 +84,7 @@ function buildTraderLinks(mint: string, pairUrl: string | null): TraderLink[] {
 export default function IntelClient({ initialMint }: { initialMint: string }) {
   const router = useRouter();
   const [mint, setMint] = useState(initialMint || "");
-  const [interval, setInterval] = useState<Interval>("1h");
+  const [interval, setChartInterval] = useState<Interval>("1h");
   const [data, setData] = useState<TokenResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [voteDirection, setVoteDirection] = useState<"up" | "down" | null>(null);
@@ -98,31 +98,39 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
     "DezXAZ8z7PnrnRJjz3wXBoRgixCa6nnaV8ZxLxmNdkq",
   ];
 
-  const load = async (targetMint: string, targetInterval: Interval) => {
+  const load = async (targetMint: string, targetInterval: Interval, silent = false) => {
     if (!targetMint) return;
     const sessionKey = `trencher:intel:${targetMint}:${targetInterval}:v1`;
     const cached = readSessionJson<TokenResponse>(sessionKey);
     if (cached?.ok) {
       setData(cached);
     }
-    setLoading(true);
-    setError(null);
+    if (!silent) setLoading(true);
+    if (!silent) setError(null);
     try {
-      const res = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}`);
-      const json = await res.json();
-      if (json?.ok) {
-        setData(json);
-        writeSessionJson(sessionKey, json);
+      const liteRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=0`);
+      const lite = await liteRes.json();
+      if (lite?.ok) {
+        setData(lite);
+        writeSessionJson(sessionKey, lite);
         router.replace(`/intel?mint=${targetMint}`);
-      } else {
+      } else if (!silent) {
         setData(null);
-        setError(json?.error?.message || "Failed to load token intel");
+        setError(lite?.error?.message || "Failed to load token intel");
+      }
+
+      // Upgrade with holders/supply details without blocking first paint.
+      const fullRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=1`);
+      const full = await fullRes.json();
+      if (full?.ok) {
+        setData(full);
+        writeSessionJson(sessionKey, full);
       }
       const votesRes = await fetch(`/api/ui/votes?chain=solana&mint=${targetMint}`);
       const votes = await votesRes.json();
       if (votes?.ok) setRecentVoters(votes.voters || []);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -141,6 +149,15 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
       load(initialMint, interval);
     }
   }, [initialMint]);
+
+  useEffect(() => {
+    if (!mint) return;
+    const timer = globalThis.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      load(mint, interval, true);
+    }, 12_000);
+    return () => clearInterval(timer);
+  }, [mint, interval]);
 
   return (
     <div className="space-y-5">
@@ -333,7 +350,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                   </Button>
                 </div>
               </div>
-              <Tabs value={interval} onValueChange={(v) => setInterval(v as Interval)}>
+              <Tabs value={interval} onValueChange={(v) => setChartInterval(v as Interval)}>
                 <TabsList className="bg-white/5">
                   {intervals.map((i) => (
                     <TabsTrigger key={i} value={i}>{i}</TabsTrigger>

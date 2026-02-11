@@ -28,6 +28,20 @@ import type {
 } from "@/lib/trencher/types";
 import { kvDel, kvSetNx } from "@/lib/trencher/kv";
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | null = null;
+  try {
+    return await Promise.race<T>([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function fetchDexFallbackCandidates(chain: Chain): Promise<string[]> {
   if (chain !== "solana") return [];
   const queries = ["pump", "pumpswap", "pumpfun", "sol"];
@@ -95,7 +109,11 @@ export async function buildToken(
         },
       })),
     includeHolders
-      ? getHolderStats(mint)
+      ? withTimeout(
+          getHolderStats(mint),
+          Number(process.env.HOLDER_STATS_TIMEOUT_MS || "3000"),
+          { holderCount: null, top10Pct: null, topHolders: [] },
+        )
       : Promise.resolve({ holderCount: null, top10Pct: null, topHolders: [] }),
     getVotes24h(chain, mint),
     getSearchCounts(chain, mint),

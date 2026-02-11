@@ -85,7 +85,18 @@ export default function DiscoverClient() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<TokenRowSummary[]>([]);
   const [voteTarget, setVoteTarget] = useState<{ mint: string; direction: "up" | "down" } | null>(null);
+  const [copiedMint, setCopiedMint] = useState<string | null>(null);
   const sessionKey = `trencher:discover:${mode}:v1`;
+
+  const copyMint = async (mint: string) => {
+    try {
+      await navigator.clipboard.writeText(mint);
+      setCopiedMint(mint);
+      setTimeout(() => setCopiedMint((v) => (v === mint ? null : v)), 1200);
+    } catch {
+      // ignore clipboard failure
+    }
+  };
 
   const load = async (m: DiscoverMode, silent = false) => {
     const cached = readSessionJson<DiscoverResponse>(`trencher:discover:${m}:v1`);
@@ -220,7 +231,14 @@ export default function DiscoverClient() {
                     </span>
                     <span>{item.name || "Unknown"} <span className="text-white/50">{item.symbol || ""}</span></span>
                   </Link>
-                  <div className="text-xs text-white/45">{shortMint(item.mint)}</div>
+                  <button
+                    type="button"
+                    className="text-xs text-white/45 hover:text-emerald-300"
+                    onClick={() => copyMint(item.mint)}
+                    title="Copy contract address"
+                  >
+                    {shortMint(item.mint)} {copiedMint === item.mint ? "Copied" : ""}
+                  </button>
                 </div>
               </div>
             </div>
@@ -255,7 +273,14 @@ export default function DiscoverClient() {
                   </span>
                   <span>{item.name || "Unknown"} {item.symbol ? `(${item.symbol})` : ""}</span>
                 </Link>
-                <div className="text-xs text-white/45">{shortMint(item.mint)}</div>
+                <button
+                  type="button"
+                  className="text-xs text-white/45 hover:text-emerald-300"
+                  onClick={() => copyMint(item.mint)}
+                  title="Copy contract address"
+                >
+                  {shortMint(item.mint)} {copiedMint === item.mint ? "Copied" : ""}
+                </button>
                 </div>
               </div>
               <div className="text-xs">{item.votes.score24h}</div>

@@ -123,6 +123,9 @@ const formatPct = (val: number | null) => {
 
 function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
   const [src, setSrc] = useState<string>(image || "/placeholder-logo.svg");
+  useEffect(() => {
+    setSrc(image || "/placeholder-logo.svg");
+  }, [image]);
   if (src) {
     return (
       <img
@@ -142,7 +145,6 @@ export default function SmartWalletsPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
-  const [expandedMint, setExpandedMint] = useState<string | null>(null);
   const [walletFilter, setWalletFilter] = useState('');
   const [mintFilter, setMintFilter] = useState('');
   const sessionKey = 'trencher:smart:snapshot:v1';
@@ -393,7 +395,7 @@ export default function SmartWalletsPage() {
                   className="w-40 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs text-white/80 placeholder:text-white/40 focus:outline-none focus:border-white/30"
                 />
               </div>
-              <p className="mt-1 text-xs text-white/50">Click a token to expand wallets and open buy/intel links.</p>
+              <p className="mt-1 text-xs text-white/50">Click a token row to open Intel instantly.</p>
             </div>
 
             <div className="max-h-[62vh] overflow-y-auto">
@@ -401,8 +403,6 @@ export default function SmartWalletsPage() {
                 <div className="px-4 py-8 text-sm text-white/50">No token activity yet.</div>
               )}
               {topMints.map((token, index) => {
-                const isOpen = expandedMint === token.mint;
-                const walletList = token.wallets.slice(0, 8);
                 const changeTone =
                   token.token.change24h === null
                     ? 'text-white/55'
@@ -412,9 +412,9 @@ export default function SmartWalletsPage() {
 
                 return (
                   <div key={token.mint} className="border-b border-white/5">
-                    <button
-                      className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
-                      onClick={() => setExpandedMint(isOpen ? null : token.mint)}
+                    <Link
+                      href={`/intel?mint=${token.mint}`}
+                      className="block w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
                     >
                       <div className="grid grid-cols-[28px_1fr_auto] gap-3 items-center">
                         <div className="text-xs text-white/40">#{index + 1}</div>
@@ -428,79 +428,18 @@ export default function SmartWalletsPage() {
                               {token.token.name || shortAddr(token.mint, 6, 6)}
                             </span>
                           </div>
-                          <div className="mt-1 text-xs text-white/50">
-                            {token.walletCount} wallets • {token.buyCount} buys • Mcap {formatUsd(token.token.marketCapUsd)} • Liq {formatUsd(token.token.liquidityUsd)} • Vol {formatUsd(token.token.volume24h)}
+                          <div className="mt-1 text-xs text-white/60">
+                            {token.walletCount} wallets • {token.buyCount} buys
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                            <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-white/90">MCAP {formatUsd(token.token.marketCapUsd)}</span>
+                            <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-white/90">VOL {formatUsd(token.token.volume24h)}</span>
+                            <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-white/80">LIQ {formatUsd(token.token.liquidityUsd)}</span>
                           </div>
                         </div>
-                        <div className={`text-sm font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
+                        <div className={`text-base font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
                       </div>
-                    </button>
-
-                    {isOpen && (
-                      <div className="px-4 pb-4">
-                        <div className="rounded-xl border border-white/10 bg-black/25 p-3">
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
-                              Price: <span className="text-white/80">{formatUsd(token.token.priceUsd)}</span>
-                            </div>
-                            <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
-                              Volume: <span className="text-white/80">{formatUsd(token.token.volume24h)}</span>
-                            </div>
-                            <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1">
-                              Mcap: <span className="text-white/80">{formatUsd(token.token.marketCapUsd)}</span>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 text-xs uppercase tracking-widest text-white/45">Wallets buying this token</div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {walletList.map((wallet) => (
-                              <Link
-                                key={`${token.mint}-${wallet}`}
-                                href={`/wallet/${wallet}`}
-                                className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-mono text-white/75 hover:border-cyan-300/40 hover:text-white"
-                              >
-                                {shortAddr(wallet, 4, 4)}
-                              </Link>
-                            ))}
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {isLikelyMint(token.mint) && (
-                              <Button asChild className="h-8 rounded-lg bg-emerald-400 text-black hover:opacity-90">
-                                <Link href={`/intel?mint=${token.mint}`}>Open Intel</Link>
-                              </Button>
-                            )}
-                            <Button asChild variant="outline" className="h-8 rounded-lg border-white/20 bg-white/5 text-white hover:bg-white/10">
-                              <a
-                                href={token.token.pairUrl || `https://dexscreener.com/solana/${token.mint}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                Buy Now
-                              </a>
-                            </Button>
-                            <Button asChild variant="outline" className="h-8 rounded-lg border-white/20 bg-white/5 text-white hover:bg-white/10">
-                              <a
-                                href="https://trade.padre.gg/rk/trencherdex"
-                                target="_blank"
-                                rel="noreferrer nofollow noopener"
-                              >
-                                Padre
-                              </a>
-                            </Button>
-                            <Button asChild variant="outline" className="h-8 rounded-lg border-white/20 bg-white/5 text-white hover:bg-white/10">
-                              <a
-                                href="https://axiom.trade/@kingsven"
-                                target="_blank"
-                                rel="noreferrer nofollow noopener"
-                              >
-                                Axiom
-                              </a>
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    </Link>
                   </div>
                 );
               })}

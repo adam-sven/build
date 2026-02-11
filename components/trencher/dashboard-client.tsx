@@ -344,6 +344,9 @@ function Metric({ title, value }: { title: string; value: string }) {
 
 function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
   const [src, setSrc] = useState<string>(image || "/placeholder-logo.svg");
+  useEffect(() => {
+    setSrc(image || "/placeholder-logo.svg");
+  }, [image]);
   if (src) {
     return (
       <img

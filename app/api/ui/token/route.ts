@@ -7,11 +7,12 @@ export async function GET(request: NextRequest) {
   const chain = parseChain(request);
   const mint = parseMint(request);
   const interval = (request.nextUrl.searchParams.get("interval") || "1h") as Interval;
+  const includeHolders = request.nextUrl.searchParams.get("includeHolders") === "1";
 
   if (!isValidSolanaMint(mint)) return err("invalid_mint", "Invalid mint", 400);
 
   try {
-    const token = await buildToken(chain, mint, interval);
+    const token = await buildToken(chain, mint, interval, { includeHolders });
     return ok(token);
   } catch {
     return err("provider_error", "Failed to load token", 502);
