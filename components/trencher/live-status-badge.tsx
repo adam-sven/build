@@ -11,6 +11,7 @@ type LiveStatus = {
 };
 
 function formatAgo(ms: number) {
+  if (!Number.isFinite(ms)) return "--";
   const sec = Math.max(0, Math.floor(ms / 1000));
   if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
@@ -73,6 +74,9 @@ export default function LiveStatusBadge() {
       : derived.level === "warming"
         ? "Warming"
         : "Stale";
+  const ageLabel = Number.isFinite(derived.staleMs)
+    ? `updated ${formatAgo(derived.staleMs)}`
+    : "no data yet";
 
   return (
     <div className="pointer-events-none fixed bottom-3 right-3 z-[85] md:bottom-4 md:right-4">
@@ -81,7 +85,7 @@ export default function LiveStatusBadge() {
           <span className="inline-block h-2 w-2 rounded-full bg-current opacity-90" />
           <span>{label}</span>
           <span>{latencyMs ? `${latencyMs}ms` : "--ms"}</span>
-          <span>updated {formatAgo(derived.staleMs)}</span>
+          <span>{ageLabel}</span>
         </span>
       </div>
     </div>
