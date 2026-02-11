@@ -161,7 +161,8 @@ export default function DashboardClient() {
         prevRows >= 20 &&
         nextRows > 0 &&
         nextRows < Math.max(8, Math.floor(prevRows * 0.45));
-      if (severeDrop) {
+      const hardEmptyDrop = hasSmartRows(prevSmart) && !hasSmartRows(nextSmart);
+      if (hardEmptyDrop || severeDrop) {
         nextSmart = prevSmart;
       }
 

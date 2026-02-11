@@ -55,15 +55,27 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     return NextResponse.json({ ok: false, error: "invalid_wallet" }, { status: 400 });
   }
 
-  const webhookSnapshot = process.env.SMART_USE_WEBHOOK_EVENTS !== "false"
-    ? await getStoredSmartSnapshotFromEvents()
-    : null;
-  const webhookHasPnl = Array.isArray((webhookSnapshot as any)?.activity)
-    && (webhookSnapshot as any).activity.some((a: any) => Array.isArray(a?.positions));
-  const { data } = webhookSnapshot && webhookHasPnl
-    ? { data: webhookSnapshot }
-    : await getSmartWalletSnapshot();
-  const activity = (data.activity || []).find((x) => x.wallet === wallet);
+  const [{ data: baseSnapshot }, webhookSnapshot] = await Promise.all([
+    getSmartWalletSnapshot(),
+    process.env.SMART_USE_WEBHOOK_EVENTS !== "false"
+      ? getStoredSmartSnapshotFromEvents()
+      : Promise.resolve(null),
+  ]);
+
+  const getWalletActivity = (snapshot: any) =>
+    (snapshot?.activity || []).find((x: any) => x?.wallet === wallet) || null;
+  const score = (activity: any) => {
+    if (!activity) return -1;
+    const buys = Array.isArray(activity?.buys) ? activity.buys.length : 0;
+    const positions = Array.isArray(activity?.positions) ? activity.positions.length : 0;
+    const pnl = Number(activity?.totalPnlSol || 0);
+    return buys * 3 + positions * 2 + (Math.abs(pnl) > 0 ? 1 : 0);
+  };
+
+  const baseActivity = getWalletActivity(baseSnapshot);
+  const webhookActivity = getWalletActivity(webhookSnapshot);
+  const data = (score(webhookActivity) > score(baseActivity) ? webhookSnapshot : baseSnapshot) || baseSnapshot;
+  const activity = getWalletActivity(data);
   if (!activity) {
     return NextResponse.json({ ok: false, error: "wallet_not_found" }, { status: 404 });
   }
@@ -152,9 +164,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
 
   const recentBuys = (activity.buys || [])
     .slice()
-    .sort((a, b) => (b.blockTime || 0) - (a.blockTime || 0))
+    .sort((a: WalletBuy, b: WalletBuy) => (b.blockTime || 0) - (a.blockTime || 0))
     .slice(0, 25)
-    .map((buy) => ({
+    .map((buy: WalletBuy) => ({
       ...buy,
       token: tokenMap.get(buy.mint) || null,
     }));
