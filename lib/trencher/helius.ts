@@ -1,4 +1,5 @@
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { normalizeImageUrl } from "@/lib/utils";
 const HOLDER_STATS_TTL_MS = Number(process.env.HOLDER_STATS_TTL_MS || `${15 * 60 * 1000}`);
 const HOLDER_COUNT_MAX_PAGES = Number(process.env.HOLDER_COUNT_MAX_PAGES || "3");
 const holderStatsCache = new Map<
@@ -170,7 +171,7 @@ export async function getAssetMetadata(mint: string): Promise<{
     const out = {
       name: typeof metadata?.name === "string" ? metadata.name : null,
       symbol: typeof metadata?.symbol === "string" ? metadata.symbol : null,
-      image: typeof links?.image === "string" ? links.image : null,
+      image: normalizeImageUrl(typeof links?.image === "string" ? links.image : null),
       website: typeof links?.external_url === "string" ? links.external_url : null,
       twitter: typeof links?.twitter === "string" ? links.twitter : null,
       telegram: typeof links?.telegram === "string" ? links.telegram : null,

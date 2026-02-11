@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSmartWalletSnapshot } from "@/lib/smart-wallets";
 import { getStoredSmartSnapshotFromEvents } from "@/lib/trencher/helius-ingest";
+import { normalizeImageUrl } from "@/lib/utils";
 
 type WalletBuy = {
   mint: string;
@@ -32,7 +33,7 @@ async function fetchTokenMeta(mint: string) {
     return {
       name: pair?.baseToken?.name || null,
       symbol: pair?.baseToken?.symbol || null,
-      image: pair?.info?.imageUrl || null,
+      image: normalizeImageUrl(pair?.info?.imageUrl || null),
       priceUsd: pair?.priceUsd ? Number(pair.priceUsd) : null,
       change24h: pair?.priceChange?.h24 ?? null,
       volume24h: pair?.volume?.h24 ?? null,
@@ -129,7 +130,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
         token: {
           name: meta?.name || null,
           symbol: meta?.symbol || null,
-          image: meta?.image || null,
+          image: normalizeImageUrl(meta?.image || null),
           priceUsd: meta?.priceUsd ?? null,
           change24h: meta?.change24h ?? null,
           volume24h: meta?.volume24h ?? null,

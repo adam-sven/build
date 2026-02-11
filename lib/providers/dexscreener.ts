@@ -1,5 +1,6 @@
 import type { Candle, Chain, Interval, MarketSnapshot, TokenIdentity } from "@/lib/trencher/types";
 import { getAssetMetadata } from "@/lib/trencher/helius";
+import { normalizeImageUrl } from "@/lib/utils";
 
 const FETCH_TIMEOUT_MS = 7_500;
 
@@ -121,7 +122,7 @@ export class DexscreenerMarketProvider {
       identity: {
         name: pair?.baseToken?.name || jupToken?.name || heliusMeta.name || null,
         symbol: pair?.baseToken?.symbol || jupToken?.symbol || heliusMeta.symbol || null,
-        image: pair?.info?.imageUrl || jupToken?.logoURI || heliusMeta.image || null,
+        image: normalizeImageUrl(pair?.info?.imageUrl || jupToken?.logoURI || heliusMeta.image || null),
         socials: {
           website: pairSocials.website || jupToken?.extensions?.website || heliusMeta.website || null,
           twitter: pairSocials.twitter || jupToken?.extensions?.twitter || heliusMeta.twitter || null,

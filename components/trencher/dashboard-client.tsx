@@ -87,7 +87,19 @@ export default function DashboardClient() {
   const [mintInput, setMintInput] = useState("");
   const [intel, setIntel] = useState<TokenResponse | null>(null);
   const [intelLoading, setIntelLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const sessionKey = "trencher:dashboard:v1";
+
+  async function fetchJsonWithTimeout(url: string, timeoutMs = 12_000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   const loadDashboard = async (silent = false) => {
     const cached = readSessionJson<{ discover: DiscoverResponse | null; smart: SmartWalletSnapshot | null }>(sessionKey);
@@ -97,17 +109,28 @@ export default function DashboardClient() {
       if (cached.smart?.ok) setSmart(cached.smart);
     }
     try {
-      const [discoverRes, smartRes] = await Promise.all([
-        fetch("/api/ui/discover?chain=solana&mode=trending"),
-        fetch("/api/smart-wallets"),
+      const [discoverRes, smartRes] = await Promise.allSettled([
+        fetchJsonWithTimeout("/api/ui/discover?chain=solana&mode=trending", 8_000),
+        fetchJsonWithTimeout("/api/smart-wallets", 8_000),
       ]);
-      const [discoverJson, smartJson] = await Promise.all([discoverRes.json(), smartRes.json()]);
-      if (discoverJson?.ok) setDiscover(discoverJson);
-      if (smartJson?.ok) setSmart(smartJson);
-      writeSessionJson(sessionKey, {
-        discover: discoverJson?.ok ? discoverJson : null,
-        smart: smartJson?.ok ? smartJson : null,
-      });
+      const discoverJson = discoverRes.status === "fulfilled" ? discoverRes.value : null;
+      const smartJson = smartRes.status === "fulfilled" ? smartRes.value : null;
+
+      const nextDiscover = discoverJson?.ok ? discoverJson : cached?.discover || null;
+      const nextSmart = smartJson?.ok ? smartJson : cached?.smart || null;
+
+      if (nextDiscover?.ok) setDiscover(nextDiscover);
+      if (nextSmart?.ok) setSmart(nextSmart);
+
+      if (discoverJson?.ok || smartJson?.ok) {
+        setError(null);
+      } else if (!silent) {
+        setError("Dashboard data timeout. Retry in a few seconds.");
+      }
+
+      writeSessionJson(sessionKey, { discover: nextDiscover, smart: nextSmart });
+    } catch {
+      if (!silent) setError("Failed to load dashboard data.");
     } finally {
       if (!silent) setLoading(false);
     }
@@ -169,6 +192,11 @@ export default function DashboardClient() {
         <Metric title="Tracked mints" value={String(smart?.topMints?.length || 0)} />
         <Metric title="Updated" value={smart?.timestamp ? new Date(smart.timestamp).toLocaleTimeString() : "-"} />
       </div>
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         <section className="xl:col-span-5 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -309,8 +337,16 @@ function Metric({ title, value }: { title: string; value: string }) {
 }
 
 function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
-  if (image) {
-    return <img src={image} alt={symbol || "token"} className="h-8 w-8 rounded-full border border-white/15 object-cover" />;
+  const [ok, setOk] = useState(Boolean(image));
+  if (image && ok) {
+    return (
+      <img
+        src={image}
+        alt={symbol || "token"}
+        className="h-8 w-8 rounded-full border border-white/15 object-cover"
+        onError={() => setOk(false)}
+      />
+    );
   }
   return (
     <div className="grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px] font-semibold text-white/70">

@@ -121,6 +121,25 @@ const formatPct = (val: number | null) => {
   return `${sign}${val.toFixed(2)}%`;
 };
 
+function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
+  const [ok, setOk] = useState(Boolean(image));
+  if (image && ok) {
+    return (
+      <img
+        src={image}
+        alt={symbol || "token"}
+        className="h-6 w-6 rounded-full border border-white/15 object-cover"
+        onError={() => setOk(false)}
+      />
+    );
+  }
+  return (
+    <div className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px]">
+      {(symbol || "T").slice(0, 1)}
+    </div>
+  );
+}
+
 export default function SmartWalletsPage() {
   const [data, setData] = useState<SmartWalletSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -405,17 +424,7 @@ export default function SmartWalletsPage() {
                         <div className="text-xs text-white/40">#{index + 1}</div>
                         <div>
                           <div className="flex items-center gap-2">
-                            {token.token.image ? (
-                              <img
-                                src={token.token.image}
-                                alt={token.token.symbol || "token"}
-                                className="h-6 w-6 rounded-full border border-white/15 object-cover"
-                              />
-                            ) : (
-                              <div className="grid h-6 w-6 place-items-center rounded-full border border-white/15 bg-white/5 text-[10px]">
-                                {(token.token.symbol || "T").slice(0, 1)}
-                              </div>
-                            )}
+                            <TokenAvatar image={token.token.image} symbol={token.token.symbol} />
                             <span className="font-semibold">
                               {token.token.symbol || shortAddr(token.mint, 4, 4)}
                             </span>

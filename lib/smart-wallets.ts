@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { normalizeImageUrl } from "@/lib/utils";
 
 export type WalletBuy = {
   mint: string;
@@ -529,7 +530,7 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
     const fromDex = {
       name: pair?.baseToken?.name || null,
       symbol: pair?.baseToken?.symbol || null,
-      image: pair?.info?.imageUrl || null,
+      image: normalizeImageUrl(pair?.info?.imageUrl || null),
       priceUsd: pair?.priceUsd ? Number(pair.priceUsd) : null,
       change24h: pair?.priceChange?.h24 ?? null,
       volume24h: pair?.volume?.h24 ?? null,
@@ -572,7 +573,7 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
       const result = {
         name: token?.name || null,
         symbol: token?.symbol || null,
-        image: token?.logoURI || null,
+        image: normalizeImageUrl(token?.logoURI || null),
         priceUsd: null,
         change24h: null,
         volume24h: null,
@@ -605,10 +606,11 @@ async function getMintMeta(mint: string): Promise<TopMint["token"]> {
       if (res.ok) {
         const json = await res.json();
         const result = json?.result;
-        const image =
+        const image = normalizeImageUrl(
           result?.content?.files?.find((f: any) => typeof f?.cdn_uri === "string")?.cdn_uri ||
-          result?.content?.files?.find((f: any) => typeof f?.uri === "string")?.uri ||
-          null;
+            result?.content?.files?.find((f: any) => typeof f?.uri === "string")?.uri ||
+            null,
+        );
         const name = result?.content?.metadata?.name || result?.content?.metadata?.symbol || null;
         const symbol = result?.content?.metadata?.symbol || null;
         if (name || symbol || image) {

@@ -6,6 +6,7 @@ import {
   getStoredSmartSnapshotFromEvents,
   refreshAndStoreSmartSnapshotFromEvents,
 } from "@/lib/trencher/helius-ingest";
+import { normalizeImageUrl } from "@/lib/utils";
 
 const RATE_LIMIT_WINDOW = 60_000;
 const RATE_LIMIT_MAX = 80;
@@ -114,7 +115,7 @@ async function hydrateTopMintMeta(data: any) {
         ...row.token,
         name: row.token?.name || pair?.baseToken?.name || null,
         symbol: row.token?.symbol || pair?.baseToken?.symbol || null,
-        image: row.token?.image || pair?.info?.imageUrl || null,
+        image: normalizeImageUrl(row.token?.image || pair?.info?.imageUrl || null),
         priceUsd: row.token?.priceUsd ?? (pair?.priceUsd ? Number(pair.priceUsd) : null),
         change24h: row.token?.change24h ?? pair?.priceChange?.h24 ?? null,
         volume24h: row.token?.volume24h ?? pair?.volume?.h24 ?? null,
@@ -133,7 +134,7 @@ async function hydrateTopMintMeta(data: any) {
         ...row.token,
         name: row.token?.name || jup?.name || null,
         symbol: row.token?.symbol || jup?.symbol || null,
-        image: row.token?.image || jup?.logoURI || null,
+        image: normalizeImageUrl(row.token?.image || jup?.logoURI || null),
       };
       continue;
     }
@@ -143,7 +144,7 @@ async function hydrateTopMintMeta(data: any) {
       ...row.token,
       name: row.token?.name || helius.name,
       symbol: row.token?.symbol || helius.symbol,
-      image: row.token?.image || helius.image,
+      image: normalizeImageUrl(row.token?.image || helius.image),
     };
   }
 
