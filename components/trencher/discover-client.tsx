@@ -57,6 +57,11 @@ function pct(v: number | null) {
   return `${s}${v.toFixed(2)}%`;
 }
 
+function pctTone(v: number | null) {
+  if (v === null || v === 0) return "text-white/70";
+  return v > 0 ? "text-emerald-300" : "text-red-300";
+}
+
 function fmtPrice(item: TokenRowSummary) {
   const v = item.priceUsd;
   if (v === null || v <= 0) return "-";
@@ -255,9 +260,9 @@ export default function DiscoverClient() {
             </div>
             <div className="col-span-1 text-xs">{fmtPrice(item)}</div>
             <div className="col-span-1 text-xs">{fmtTx(item.txCount24h)}</div>
-            <div className="col-span-1 text-xs">{pct(item.priceChange.m5)}</div>
-            <div className="col-span-1 text-xs">{pct(item.priceChange.h1)}</div>
-            <div className="col-span-1 text-xs">{pct(item.priceChange.h24)}</div>
+            <div className={`col-span-1 text-xs ${pctTone(item.priceChange.m5)}`}>{pct(item.priceChange.m5)}</div>
+            <div className={`col-span-1 text-xs ${pctTone(item.priceChange.h1)}`}>{pct(item.priceChange.h1)}</div>
+            <div className={`col-span-1 text-xs ${pctTone(item.priceChange.h24)}`}>{pct(item.priceChange.h24)}</div>
             <div className="col-span-1 text-xs">{usd(item.liquidityUsd)}</div>
             <div className="col-span-1 text-xs">{usd(item.marketCapUsd)}</div>
             <div className="col-span-1 text-xs">
@@ -301,6 +306,9 @@ export default function DiscoverClient() {
               <div>Liq {usd(item.liquidityUsd)}</div>
               <div>Vol {usd(item.volume24hUsd)}</div>
               <div>MC {usd(item.marketCapUsd)}</div>
+              <div className={pctTone(item.priceChange.m5)}>5m {pct(item.priceChange.m5)}</div>
+              <div className={pctTone(item.priceChange.h1)}>1h {pct(item.priceChange.h1)}</div>
+              <div className={pctTone(item.priceChange.h24)}>24h {pct(item.priceChange.h24)}</div>
             </div>
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="outline" className="h-7 border-white/20" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>Upvote</Button>
