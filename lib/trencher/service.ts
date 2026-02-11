@@ -86,10 +86,9 @@ export async function buildToken(
   options?: { includeHolders?: boolean },
 ): Promise<TokenResponse> {
   const includeHolders = options?.includeHolders !== false;
-  if (includeHolders) {
-    const cached = await getCachedToken<TokenResponse>(chain, mint);
-    if (cached) return cached;
-  }
+  const tokenCacheScope = `${interval}:${includeHolders ? "full" : "lite"}`;
+  const cached = await getCachedToken<TokenResponse>(chain, mint, tokenCacheScope);
+  if (cached) return cached;
 
   const [marketData, holders, votes, search, peak, candles] = await Promise.all([
     marketProvider
@@ -183,8 +182,16 @@ export async function buildToken(
     peakUpvotes24h: Math.max(peak.peakUpvotes24h, votes.up24h),
   });
 
+  const liteTtl = Number(process.env.TOKEN_CACHE_TTL_LITE_SEC || "18");
+  const fullTtl = Number(process.env.TOKEN_CACHE_TTL_FULL_SEC || "45");
+
   if (includeHolders) {
-    await cacheToken(chain, mint, payload, 45);
+    await Promise.all([
+      cacheToken(chain, mint, payload, fullTtl, tokenCacheScope),
+      cacheToken(chain, mint, payload, liteTtl, `${interval}:lite`),
+    ]);
+  } else {
+    await cacheToken(chain, mint, payload, liteTtl, tokenCacheScope);
   }
   return payload;
 }

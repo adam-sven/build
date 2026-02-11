@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { buildToken } from "@/lib/trencher/service";
-import { err, isValidSolanaMint, ok, parseChain, parseMint } from "@/lib/trencher/http";
+import { err, isValidSolanaMint, parseChain, parseMint } from "@/lib/trencher/http";
 import type { Interval } from "@/lib/trencher/types";
 
 export async function GET(request: NextRequest) {
@@ -13,7 +14,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const token = await buildToken(chain, mint, interval, { includeHolders });
-    return ok(token);
+    const cacheControl = includeHolders
+      ? "public, s-maxage=20, stale-while-revalidate=120"
+      : "public, s-maxage=10, stale-while-revalidate=60";
+    return NextResponse.json(token, {
+      headers: {
+        "Cache-Control": cacheControl,
+      },
+    });
   } catch {
     return err("provider_error", "Failed to load token", 502);
   }

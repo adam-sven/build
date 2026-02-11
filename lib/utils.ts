@@ -19,6 +19,7 @@ export function normalizeImageUrl(url: string | null | undefined): string | null
     return `https://arweave.net/${id}`;
   }
 
-  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (value.startsWith("https://")) return value;
+  if (value.startsWith("http://")) return value.replace(/^http:\/\//i, "https://");
   return null;
 }

@@ -18,12 +18,21 @@ function shortMint(mint: string) {
 }
 
 function TokenAvatar({ image, symbol }: { image: string | null; symbol: string | null }) {
-  if (image) {
+  const [src, setSrc] = useState<string | null>(image);
+
+  useEffect(() => {
+    setSrc(image);
+  }, [image]);
+
+  if (src) {
     return (
       <img
-        src={image}
+        src={src}
         alt={symbol || "token"}
         className="h-8 w-8 rounded-full border border-white/15 object-cover"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setSrc(null)}
       />
     );
   }

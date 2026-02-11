@@ -500,12 +500,18 @@ export async function getCachedFeed<T>(
   return null;
 }
 
-export async function cacheToken(chain: Chain, mint: string, payload: any, ttlSeconds = 45) {
-  await kvSet(`trencher:token:${chain}:${mint}`, payload, ttlSeconds);
+export async function cacheToken(
+  chain: Chain,
+  mint: string,
+  payload: any,
+  ttlSeconds = 45,
+  scope = "default",
+) {
+  await kvSet(`trencher:token:${chain}:${mint}:${scope}`, payload, ttlSeconds);
 }
 
-export async function getCachedToken<T>(chain: Chain, mint: string): Promise<T | null> {
-  return kvGet<T>(`trencher:token:${chain}:${mint}`);
+export async function getCachedToken<T>(chain: Chain, mint: string, scope = "default"): Promise<T | null> {
+  return kvGet<T>(`trencher:token:${chain}:${mint}:${scope}`);
 }
 
 export async function initDefaultApiKeys() {

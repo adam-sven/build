@@ -132,6 +132,8 @@ function TokenAvatar({ image, symbol }: { image: string | null; symbol: string |
         src={src}
         alt={symbol || "token"}
         className="h-6 w-6 rounded-full border border-white/15 object-cover"
+        loading="lazy"
+        referrerPolicy="no-referrer"
         onError={() => setSrc("/placeholder-logo.svg")}
       />
     );
