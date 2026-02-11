@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
 import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
@@ -162,6 +163,7 @@ function TokenAvatar({ image, symbol, mint }: { image: string | null; symbol: st
 }
 
 export default function SmartWalletsPage() {
+  const router = useRouter();
   const [data, setData] = useState<SmartWalletSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +171,7 @@ export default function SmartWalletsPage() {
   const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
   const [walletFilter, setWalletFilter] = useState('');
   const [mintFilter, setMintFilter] = useState('');
+  const [smartSearch, setSmartSearch] = useState("");
   const sessionKey = 'trencher:smart:snapshot:v1';
   const localKey = "trencher:smart:snapshot:persist:v1";
 
@@ -321,6 +324,44 @@ export default function SmartWalletsPage() {
     });
   }, [data, mintFilter]);
 
+  const openSmartSearch = () => {
+    const q = smartSearch.trim();
+    if (!q) return;
+    const qLower = q.toLowerCase();
+    const looksLikeWallet = /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(q);
+    const looksLikeMint = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(q);
+
+    const matchedWallet = (data?.topWallets || []).find((w) => {
+      const label = `${w.wallet} ${w.profile?.name || ""}`.toLowerCase();
+      return label.includes(qLower);
+    });
+    if (matchedWallet) {
+      router.push(`/wallet/${matchedWallet.wallet}`);
+      return;
+    }
+
+    const matchedToken = (data?.topMints || []).find((m) => {
+      const label = `${m.mint} ${m.token?.symbol || ""} ${m.token?.name || ""}`.toLowerCase();
+      return label.includes(qLower);
+    });
+    if (matchedToken) {
+      router.push(`/intel?mint=${matchedToken.mint}`);
+      return;
+    }
+
+    if (looksLikeWallet && !looksLikeMint) {
+      router.push(`/wallet/${q}`);
+      return;
+    }
+    if (looksLikeMint || looksLikeWallet) {
+      router.push(`/intel?mint=${q}`);
+      return;
+    }
+
+    setWalletFilter(q);
+    setMintFilter(q);
+  };
+
   return (
     <main className="min-h-screen text-foreground bg-[radial-gradient(1200px_500px_at_10%_-10%,#14213d_0%,transparent_60%),radial-gradient(900px_400px_at_90%_10%,#1f2937_0%,transparent_55%),#05070b]">
       <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
@@ -337,13 +378,31 @@ export default function SmartWalletsPage() {
         </div>
 
         <div className="mb-4">
-          <Button
-            onClick={forceRefresh}
-            disabled={refreshing}
-            className="h-8 rounded-lg bg-emerald-400 text-black hover:opacity-90"
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh now'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={smartSearch}
+              onChange={(e) => setSmartSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") openSmartSearch();
+              }}
+              placeholder="Search token (mint/symbol) or wallet (address/name)"
+              className="h-8 w-full max-w-xl rounded-lg border border-white/10 bg-black/40 px-3 text-xs text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/30"
+            />
+            <Button
+              onClick={openSmartSearch}
+              className="h-8 rounded-lg bg-emerald-400 text-black hover:opacity-90"
+            >
+              Open
+            </Button>
+            <Button
+              onClick={forceRefresh}
+              disabled={refreshing}
+              variant="outline"
+              className="h-8 rounded-lg border-white/20"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh now'}
+            </Button>
+          </div>
         </div>
 
         {data?.stats && (
