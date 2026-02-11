@@ -32,7 +32,6 @@ export default function TrencherNav() {
             <span>Trencher</span>
           </Link>
           <div className="flex items-center gap-2">
-            <ThemeToggle compact />
             <ConnectButton />
             <Button
               type="button"
@@ -79,6 +78,9 @@ export default function TrencherNav() {
                 );
               })}
             </nav>
+            <div className="mt-4">
+              <ThemeToggle compact />
+            </div>
           </aside>
         </div>
       )}
@@ -109,7 +111,8 @@ export default function TrencherNav() {
               );
             })}
           </nav>
-          <div className="mt-4 space-y-2">
+          <div className="mt-auto space-y-2">
+            <ThemeToggle compact />
             <a
               href="https://gmgn.ai/r/l6KmuuAJ"
               target="_blank"

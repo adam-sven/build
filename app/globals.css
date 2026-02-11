@@ -157,6 +157,33 @@ body {
 /* Light mode skin */
 :root.trencher-light {
   color-scheme: light;
+  --background: 210 20% 97%;
+  --foreground: 222 47% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 12%;
+  --primary: 160 84% 39%;
+  --primary-foreground: 160 20% 10%;
+  --secondary: 210 20% 92%;
+  --secondary-foreground: 222 47% 12%;
+  --muted: 210 20% 92%;
+  --muted-foreground: 220 14% 35%;
+  --accent: 210 20% 92%;
+  --accent-foreground: 222 47% 12%;
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 220 13% 80%;
+  --input: 220 13% 80%;
+  --ring: 160 84% 39%;
+  --sidebar-background: 210 20% 95%;
+  --sidebar-foreground: 222 47% 12%;
+  --sidebar-primary: 160 84% 39%;
+  --sidebar-primary-foreground: 160 20% 10%;
+  --sidebar-accent: 210 20% 90%;
+  --sidebar-accent-foreground: 222 47% 12%;
+  --sidebar-border: 220 13% 80%;
+  --sidebar-ring: 160 84% 39%;
 }
 
 :root.trencher-light body {
@@ -177,6 +204,12 @@ body {
   background-color: rgba(255, 255, 255, 0.9) !important;
 }
 
+:root.trencher-light button[class*="bg-black"],
+:root.trencher-light a[class*="bg-black"] {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
 :root.trencher-light [class*="border-white"] {
   border-color: rgba(15, 23, 42, 0.14) !important;
 }
@@ -188,6 +221,22 @@ body {
 :root.trencher-light [class*="text-cyan-300"],
 :root.trencher-light [class*="text-emerald-300"] {
   color: rgb(5 150 105) !important;
+}
+
+:root.trencher-light [class*="text-emerald-200"] {
+  color: rgb(4 120 87) !important;
+}
+
+:root.trencher-light [class*="text-cyan-200"] {
+  color: rgb(14 116 144) !important;
+}
+
+:root.trencher-light [class*="text-amber-200"] {
+  color: rgb(180 83 9) !important;
+}
+
+:root.trencher-light [class*="text-violet-200"] {
+  color: rgb(109 40 217) !important;
 }
 
 :root.trencher-light [class*="text-red-300"] {

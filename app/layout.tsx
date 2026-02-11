@@ -6,7 +6,6 @@ import TrencherGlobalSearch from "@/components/trencher-global-search";
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
 import ConnectButton from '@/components/wallet/connect-button'
 import LiveStatusBadge from "@/components/trencher/live-status-badge";
-import ThemeToggle from "@/components/theme-toggle";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 import './globals.css'
@@ -39,7 +38,6 @@ export default function RootLayout({
             <div className="border-b border-white/10 bg-black/25">
               <div className="hidden w-full justify-end px-3 pt-2 md:flex md:px-6">
                 <div className="flex items-center gap-2">
-                  <ThemeToggle />
                   <ConnectButton />
                 </div>
               </div>
