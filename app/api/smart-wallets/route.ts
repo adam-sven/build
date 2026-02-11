@@ -7,6 +7,7 @@ import {
   refreshAndStoreSmartSnapshotFromEvents,
 } from "@/lib/trencher/helius-ingest";
 import { normalizeImageUrl } from "@/lib/utils";
+import { getWalletProfilesMap } from "@/lib/wallet-profiles";
 
 const RATE_LIMIT_WINDOW = 60_000;
 const RATE_LIMIT_MAX = 80;
@@ -152,6 +153,43 @@ async function hydrateTopMintMeta(data: any) {
   return data;
 }
 
+function hydrateWalletProfiles(data: any) {
+  const profiles = getWalletProfilesMap();
+  if (!profiles.size) return data;
+
+  const topWallets = Array.isArray(data?.topWallets) ? data.topWallets : [];
+  for (const row of topWallets) {
+    const wallet = String(row?.wallet || "");
+    const profile = profiles.get(wallet);
+    if (!profile) continue;
+    row.profile = {
+      rank: profile.rank,
+      name: profile.name,
+      accountUrl: profile.accountUrl,
+      twitter: profile.twitter,
+      telegram: profile.telegram,
+      website: profile.website,
+    };
+  }
+
+  const activity = Array.isArray(data?.activity) ? data.activity : [];
+  for (const row of activity) {
+    const wallet = String(row?.wallet || "");
+    const profile = profiles.get(wallet);
+    if (!profile) continue;
+    row.profile = {
+      rank: profile.rank,
+      name: profile.name,
+      accountUrl: profile.accountUrl,
+      twitter: profile.twitter,
+      telegram: profile.telegram,
+      website: profile.website,
+    };
+  }
+
+  return data;
+}
+
 function getSnapshotFingerprint(data: any): string {
   const ts = String(data?.timestamp || "");
   const top = Array.isArray(data?.topMints) ? data.topMints.slice(0, 12) : [];
@@ -173,7 +211,7 @@ export async function GET(request: NextRequest) {
 
     if (force) {
       const data = await buildSmartWalletSnapshot(true);
-      const hydrated = await hydrateTopMintMeta(data);
+      const hydrated = hydrateWalletProfiles(await hydrateTopMintMeta(data));
       return NextResponse.json(hydrated, {
         headers: {
           "Cache-Control": "no-store, max-age=0",
@@ -213,7 +251,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const hydrated = await hydrateTopMintMeta(data);
+    const hydrated = hydrateWalletProfiles(await hydrateTopMintMeta(data));
     hydratedCache = { at: now, fingerprint: fp, data: hydrated };
     return NextResponse.json(hydrated, {
       headers: {

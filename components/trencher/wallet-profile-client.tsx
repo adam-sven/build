@@ -7,6 +7,14 @@ import { Button } from "@/components/ui/button";
 type WalletProfile = {
   ok: boolean;
   wallet: string;
+  profile: {
+    rank: number | null;
+    name: string | null;
+    accountUrl: string | null;
+    twitter: string | null;
+    telegram: string | null;
+    website: string | null;
+  } | null;
   updatedAt: string;
   summary: {
     sampledPnlSol: number;
@@ -137,7 +145,24 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
         <div>
           <Link href="/smart" className="text-xs text-cyan-300 hover:text-cyan-200">← Back to Smart Wallets</Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Wallet Profile</h1>
-          <div className="mt-1 font-mono text-sm text-white/70">{short(wallet, 10, 10)}</div>
+          <div className="mt-1 text-sm text-white/90">{data?.profile?.name || short(wallet, 10, 10)}</div>
+          <div className="mt-1 font-mono text-xs text-white/60">{short(wallet, 10, 10)}</div>
+          {(data?.profile?.twitter || data?.profile?.telegram || data?.profile?.accountUrl || data?.profile?.website) && (
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {data?.profile?.twitter && (
+                <a href={data.profile.twitter} target="_blank" rel="noreferrer nofollow noopener" className="rounded border border-white/15 px-2 py-1 text-white/70 hover:text-white">X</a>
+              )}
+              {data?.profile?.telegram && (
+                <a href={data.profile.telegram} target="_blank" rel="noreferrer nofollow noopener" className="rounded border border-white/15 px-2 py-1 text-white/70 hover:text-white">Telegram</a>
+              )}
+              {data?.profile?.website && (
+                <a href={data.profile.website} target="_blank" rel="noreferrer nofollow noopener" className="rounded border border-white/15 px-2 py-1 text-white/70 hover:text-white">Website</a>
+              )}
+              {data?.profile?.accountUrl && (
+                <a href={data.profile.accountUrl} target="_blank" rel="noreferrer nofollow noopener" className="rounded border border-white/15 px-2 py-1 text-white/70 hover:text-white">KOL</a>
+              )}
+            </div>
+          )}
         </div>
         <a
           href={`https://solscan.io/account/${wallet}`}

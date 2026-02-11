@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSmartWalletSnapshot } from "@/lib/smart-wallets";
 import { getStoredSmartSnapshotFromEvents } from "@/lib/trencher/helius-ingest";
 import { normalizeImageUrl } from "@/lib/utils";
+import { getWalletProfile } from "@/lib/wallet-profiles";
 
 type WalletBuy = {
   mint: string;
@@ -67,6 +68,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     return NextResponse.json({ ok: false, error: "wallet_not_found" }, { status: 404 });
   }
   const activityAny = activity as any;
+  const profile = getWalletProfile(wallet);
 
   const tokenMap = new Map<string, any>();
   for (const row of data.topMints || []) {
@@ -160,6 +162,16 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   return NextResponse.json({
     ok: true,
     wallet,
+    profile: profile
+      ? {
+          rank: profile.rank,
+          name: profile.name,
+          accountUrl: profile.accountUrl,
+          twitter: profile.twitter,
+          telegram: profile.telegram,
+          website: profile.website,
+        }
+      : null,
     updatedAt: data.timestamp,
     summary: {
       sampledPnlSol: activity.sampledPnlSol,

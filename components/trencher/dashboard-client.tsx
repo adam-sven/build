@@ -25,6 +25,14 @@ type SmartWalletSnapshot = {
     sampledPnlSol: number;
     uniqueMints: number;
     totalPnlSol?: number;
+    profile?: {
+      rank: number | null;
+      name: string | null;
+      accountUrl: string | null;
+      twitter: string | null;
+      telegram: string | null;
+      website: string | null;
+    } | null;
   }>;
   topMints: Array<{
     mint: string;
@@ -280,7 +288,7 @@ export default function DashboardClient() {
                 className="flex items-center justify-between rounded-lg border border-white/10 bg-black/25 p-2 hover:border-cyan-300/30"
               >
                 <div>
-                  <div className="text-sm font-medium">#{idx + 1} {short(wallet.wallet)}</div>
+                  <div className="text-sm font-medium">#{idx + 1} {wallet.profile?.name || short(wallet.wallet)}</div>
                   <div className="text-xs text-white/55">Buys {wallet.buyCount} • Mints {wallet.uniqueMints}</div>
                 </div>
                 <div className={(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? "text-sm text-emerald-300" : "text-sm text-red-300"}>

@@ -37,6 +37,14 @@ type TopWallet = {
   txCount: number;
   lastSeen: number | null;
   topMints: string[];
+  profile?: {
+    rank: number | null;
+    name: string | null;
+    accountUrl: string | null;
+    twitter: string | null;
+    telegram: string | null;
+    website: string | null;
+  } | null;
 };
 
 type TopMint = {
@@ -236,7 +244,10 @@ export default function SmartWalletsPage() {
     const list = (data?.topWallets || []).filter((item) => item.buyCount > 0);
     if (!walletFilter.trim()) return list;
     const q = walletFilter.toLowerCase();
-    return list.filter((item) => item.wallet.toLowerCase().includes(q));
+    return list.filter((item) => {
+      const label = `${item.wallet} ${item.profile?.name || ""}`.toLowerCase();
+      return label.includes(q);
+    });
   }, [data, walletFilter]);
 
   const topMints = useMemo(() => {
@@ -343,11 +354,33 @@ export default function SmartWalletsPage() {
                       <div className="grid grid-cols-[28px_1fr_auto] gap-3 items-center">
                         <div className="text-xs text-white/40">#{index + 1}</div>
                         <div>
-                          <Link href={`/wallet/${wallet.wallet}`} className="font-mono text-sm text-cyan-200 hover:text-cyan-100">
-                            {shortAddr(wallet.wallet, 7, 7)}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/wallet/${wallet.wallet}`} className="font-mono text-sm text-cyan-200 hover:text-cyan-100">
+                              {wallet.profile?.name || shortAddr(wallet.wallet, 7, 7)}
+                            </Link>
+                            {wallet.profile?.twitter && (
+                              <a
+                                href={wallet.profile.twitter}
+                                target="_blank"
+                                rel="noreferrer nofollow noopener"
+                                className="text-[10px] text-white/55 hover:text-white/80"
+                              >
+                                X
+                              </a>
+                            )}
+                            {wallet.profile?.telegram && (
+                              <a
+                                href={wallet.profile.telegram}
+                                target="_blank"
+                                rel="noreferrer nofollow noopener"
+                                className="text-[10px] text-white/55 hover:text-white/80"
+                              >
+                                TG
+                              </a>
+                            )}
+                          </div>
                           <div className="mt-1 text-xs text-white/50">
-                            Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
+                            {shortAddr(wallet.wallet, 7, 7)} • Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
                           </div>
                         </div>
                         <div className={`text-sm font-semibold ${(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
