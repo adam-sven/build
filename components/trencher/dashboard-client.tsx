@@ -347,17 +347,17 @@ export default function DashboardClient() {
           </div>
         </section>
 
-        <section className="xl:col-span-4 rounded-2xl border border-white/10 bg-black/30 p-4">
+        <section className="xl:col-span-4 rounded-2xl border border-white/10 bg-black/30 p-4 flex h-full flex-col">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-semibold">Top 5 Traders</h2>
             <Link href="/smart" className="text-xs text-cyan-300 hover:text-cyan-200">Open Smart Wallets</Link>
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-1 flex-col gap-2">
             {topWallets.map((wallet, idx) => (
               <Link
                 key={wallet.wallet}
                 href={`/wallet/${wallet.wallet}`}
-                className="flex items-center justify-between rounded-lg border border-white/10 bg-black/25 p-2 hover:border-cyan-300/30"
+                className="flex min-h-[60px] flex-1 items-center justify-between rounded-lg border border-white/10 bg-black/25 p-2 hover:border-cyan-300/30"
               >
                 <div>
                   <div className="text-sm font-medium">#{idx + 1} {wallet.profile?.name || short(wallet.wallet)}</div>
