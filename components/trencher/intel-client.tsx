@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnimatedUsd from "@/components/trencher/animated-usd";
 import AnimatedNumber from "@/components/trencher/animated-number";
 import {
@@ -19,7 +18,6 @@ import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import { Globe, Twitter } from "lucide-react";
 import NativeCandleChart from "@/components/trencher/native-candle-chart";
 
-const intervals: Interval[] = ["1m", "5m", "1h", "24h", "7d"];
 const MIN_NATIVE_CANDLES = Math.max(8, Number(process.env.NEXT_PUBLIC_INTEL_NATIVE_MIN_CANDLES || "24"));
 
 function fmtUsd(v: number | null) {
@@ -454,13 +452,6 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                   </Button>
                 </div>
               </div>
-              <Tabs value={interval} onValueChange={(v) => setChartInterval(v as Interval)}>
-                <TabsList className="bg-white/5">
-                  {intervals.map((i) => (
-                    <TabsTrigger key={i} value={i}>{i}</TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70 md:grid-cols-4">
               <div>Price <span className="ml-1 font-semibold text-white"><AnimatedUsd value={data.market.priceUsd} /></span></div>
