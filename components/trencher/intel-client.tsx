@@ -20,6 +20,7 @@ import { Globe, Twitter } from "lucide-react";
 import NativeCandleChart from "@/components/trencher/native-candle-chart";
 
 const intervals: Interval[] = ["1m", "5m", "1h", "24h", "7d"];
+const MIN_NATIVE_CANDLES = Math.max(8, Number(process.env.NEXT_PUBLIC_INTEL_NATIVE_MIN_CANDLES || "24"));
 
 function fmtUsd(v: number | null) {
   if (v === null) return "-";
@@ -83,6 +84,12 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const [recentVoters, setRecentVoters] = useState<string[]>([]);
   const [chartSource, setChartSource] = useState<"native" | "gmgn">("native");
   const [isLightTheme, setIsLightTheme] = useState(false);
+  const [nativeSeries, setNativeSeries] = useState<
+    Array<{ t: number; close: number; open: number; high: number; low: number; volume: number }>
+  >([]);
+  const nativeSeriesCacheRef = useRef(
+    new Map<string, Array<{ t: number; close: number; open: number; high: number; low: number; volume: number }>>(),
+  );
   const [error, setError] = useState<string | null>(null);
   const requestSeqRef = useRef(0);
   const mintRef = useRef(mint);
@@ -233,6 +240,40 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!data?.mint) return;
+    const key = `${data.mint}:${interval}`;
+    const chartItems = Array.isArray(data.candles.items) ? data.candles.items : [];
+    const candidate = chartItems
+      .filter((c) => Number.isFinite(c.t) && Number.isFinite(c.c))
+      .map((c) => ({
+        t: normalizeTsSeconds(c.t),
+        close: Number(c.c),
+        open: Number(c.o),
+        high: Number(c.h),
+        low: Number(c.l),
+        volume: Number(c.v),
+      }))
+      .sort((a, b) => a.t - b.t);
+
+    const prev = nativeSeriesCacheRef.current.get(key) || [];
+    // Only accept new native data if it is at least as complete as what we already have.
+    if (candidate.length >= prev.length) {
+      nativeSeriesCacheRef.current.set(key, candidate);
+      setNativeSeries(candidate);
+    } else {
+      setNativeSeries(prev);
+    }
+  }, [data?.mint, data?.candles, interval]);
+
+  useEffect(() => {
+    if (!data || loading) return;
+    if (chartSource !== "native") return;
+    if (nativeSeries.length >= MIN_NATIVE_CANDLES) return;
+    // Auto-fallback when native quality is too low to avoid blank/flickering native view.
+    setChartSource("gmgn");
+  }, [chartSource, data, loading, nativeSeries.length]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -299,19 +340,8 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
       {data && (
         <>
           {(() => {
-            const chartItems = Array.isArray(data.candles.items) ? data.candles.items : [];
-            const nativePoints = chartItems
-              .filter((c) => Number.isFinite(c.t) && Number.isFinite(c.c))
-              .map((c) => ({
-                t: normalizeTsSeconds(c.t),
-                close: Number(c.c),
-                open: Number(c.o),
-                high: Number(c.h),
-                low: Number(c.l),
-                volume: Number(c.v),
-              }))
-              .sort((a, b) => a.t - b.t);
-            const chartSeries = nativePoints;
+            const chartSeries = nativeSeries;
+            const nativeReady = chartSeries.length >= MIN_NATIVE_CANDLES;
             const gmgnSrc = `https://www.gmgn.cc/kline/sol/${data.mint}?interval=${encodeURIComponent(
               gmgnInterval(interval),
             )}&theme=${isLightTheme ? "light" : "dark"}&chartType=line`;
@@ -454,13 +484,13 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                   referrerPolicy="no-referrer-when-downgrade"
                 />
               )}
-              {chartSource === "native" && chartSeries.length > 1 && (
+              {chartSource === "native" && nativeReady && (
                 <NativeCandleChart symbol={data.identity.symbol || "TOKEN"} data={chartSeries} isLightTheme={isLightTheme} />
               )}
-              {chartSource === "native" && chartSeries.length <= 1 && (
+              {chartSource === "native" && !nativeReady && (
                 <div className="grid h-full place-items-center px-6 text-center text-sm text-white/60">
                   <div>
-                    Native OHLC data is unavailable for this token/interval.
+                    Native OHLC quality is low for this token/interval ({chartSeries.length}/{MIN_NATIVE_CANDLES} candles).
                     <div className="mt-2">
                       <Button
                         size="sm"
@@ -475,9 +505,9 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 </div>
               )}
             </div>
-            {chartSource === "native" && nativePoints.length <= 1 && (
+            {chartSource === "native" && !nativeReady && (
               <div className="mt-2 text-xs text-white/50">
-                No synthetic fallback is shown to avoid misleading trend shapes. Use GMGN for charting when OHLC is sparse.
+                Native is shown only when enough candles are available to avoid misleading chart shapes.
               </div>
             )}
           </section>
