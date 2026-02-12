@@ -76,7 +76,7 @@ type PumpfunTrendingResponse = {
 
 type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
 const SOURCE_META: Record<Exclude<SourceFilter, "all">, { label: string; icon: string }> = {
-  pumpfun: { label: "Pumpfun", icon: "/source-pumpfun.svg" },
+  pumpfun: { label: "Pumpfun", icon: "/source-pumpfun.png" },
   bagsapp: { label: "BagsApp", icon: "/source-bagsapp.svg" },
   other: { label: "Solana", icon: "/source-solana.svg" },
 };
