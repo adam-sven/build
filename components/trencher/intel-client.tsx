@@ -150,6 +150,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
     }
     if (!silent) setLoading(true);
     if (!silent) setError(null);
+    if (!silent) setChartSource("native");
     try {
       const liteRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=0`);
       const lite = await liteRes.json();
@@ -263,14 +264,6 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
       setNativeSeries(prev);
     }
   }, [data?.mint, data?.candles, interval]);
-
-  useEffect(() => {
-    if (!data || loading) return;
-    if (chartSource !== "native") return;
-    if (nativeSeries.length >= MIN_NATIVE_CANDLES) return;
-    // Auto-fallback when native quality is too low to avoid blank/flickering native view.
-    setChartSource("gmgn");
-  }, [chartSource, data, loading, nativeSeries.length]);
 
   return (
     <div className="space-y-5">
