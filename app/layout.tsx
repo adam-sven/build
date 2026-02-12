@@ -4,7 +4,6 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import TrencherNav from '@/components/trencher-nav'
 import TrencherGlobalSearch from "@/components/trencher-global-search";
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
-import ConnectButton from '@/components/wallet/connect-button'
 import LiveStatusBadge from "@/components/trencher/live-status-badge";
 import LiveRefreshAgent from "@/components/trencher/live-refresh-agent";
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -38,11 +37,6 @@ export default function RootLayout({
               Ranking is driven by community votes, search interest, and market quality - not payments.
             </div>
             <div className="border-b border-white/10 bg-black/25">
-              <div className="hidden w-full justify-end px-3 pt-2 md:flex md:px-6">
-                <div className="flex items-center gap-2">
-                  <ConnectButton />
-                </div>
-              </div>
               <TrencherGlobalSearch />
             </div>
             {children}
