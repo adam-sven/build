@@ -312,6 +312,30 @@ function snapshotRows(data: any): number {
   return w + m;
 }
 
+function chooseBestSnapshot(
+  webhook: any | null,
+  polled: any | null,
+  expectedWalletCount: number,
+): { data: any; source: "webhook" | "polled" } {
+  if (!polled) return { data: webhook, source: "webhook" };
+  if (!webhook) return { data: polled, source: "polled" };
+
+  const webhookRows = hasDetailedWalletMetrics(webhook, expectedWalletCount) ? snapshotRows(webhook) : 0;
+  const polledRows = snapshotRows(polled);
+  const webhookTs = webhook?.timestamp ? new Date(webhook.timestamp).getTime() : 0;
+  const polledTs = polled?.timestamp ? new Date(polled.timestamp).getTime() : 0;
+
+  if (webhookRows === 0) return { data: polled, source: "polled" };
+  if (polledRows === 0) return { data: webhook, source: "webhook" };
+
+  // Guard against flash-collapse: a very small/partial webhook snapshot must not override a richer polled snapshot.
+  const tooSparseVsPolled = webhookRows < Math.max(10, Math.floor(polledRows * 0.65));
+  if (tooSparseVsPolled) return { data: polled, source: "polled" };
+
+  const webhookNewer = webhookTs >= polledTs;
+  return webhookNewer ? { data: webhook, source: "webhook" } : { data: polled, source: "polled" };
+}
+
 function hasDetailedWalletMetrics(snapshot: any, expectedWalletCount: number): boolean {
   if (!snapshot || Number(snapshot?.stats?.totalWallets || 0) < expectedWalletCount) return false;
   const activity = Array.isArray(snapshot?.activity) ? snapshot.activity : [];
@@ -439,15 +463,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: polled, stale, source } = await getSmartWalletSnapshot();
-    const webhookRows = hasDetailedWalletMetrics(cachedWebhook, expectedWalletCount)
-      ? snapshotRows(cachedWebhook)
-      : 0;
-    const polledRows = snapshotRows(polled);
-    const webhookTs = cachedWebhook?.timestamp ? new Date(cachedWebhook.timestamp).getTime() : 0;
-    const polledTs = polled?.timestamp ? new Date(polled.timestamp).getTime() : 0;
-    const useWebhook = webhookRows > 0 && (polledRows === 0 || webhookTs >= polledTs);
-    const data = useWebhook ? cachedWebhook : polled;
-    const effectiveSource = useWebhook ? "webhook" : source;
+    const picked = chooseBestSnapshot(cachedWebhook, polled, expectedWalletCount);
+    const data = picked.data || polled;
+    const effectiveSource = picked.source === "webhook" ? "webhook" : source;
 
     const fp = getSnapshotFingerprint(data);
     const now = Date.now();
