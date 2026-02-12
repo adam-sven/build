@@ -9,7 +9,11 @@ import AnimatedSol from '@/components/trencher/animated-sol';
 import AnimatedNumber from '@/components/trencher/animated-number';
 import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
-const SMART_POLL_MS = Math.max(20_000, Number(process.env.NEXT_PUBLIC_SMART_POLL_MS || "45000"));
+const SMART_POLL_MS = Math.max(20_000, Number(process.env.NEXT_PUBLIC_SMART_POLL_MS || "20000"));
+const SMART_FORCE_REFRESH_MIN_MS = Math.max(
+  60_000,
+  Number(process.env.NEXT_PUBLIC_SMART_FORCE_REFRESH_MIN_MS || "120000"),
+);
 
 type WalletBuy = {
   mint: string;
@@ -184,6 +188,7 @@ export default function SmartWalletsPage() {
   const [mintFilter, setMintFilter] = useState('');
   const [smartSearch, setSmartSearch] = useState("");
   const enrichRunKeyRef = useRef<string>("");
+  const lastForceRefreshAtRef = useRef(0);
   const sessionKey = 'trencher:smart:snapshot:v1';
   const localKey = "trencher:smart:snapshot:persist:v1";
 
@@ -225,7 +230,8 @@ export default function SmartWalletsPage() {
     const load = async (force = false, silent = false) => {
       if (!silent && !hasCachedRows) setLoading(true);
       try {
-        const res = await fetch(`/api/smart-wallets${force ? '?force=1' : ''}`);
+        const qs = force ? `force=1&t=${Date.now()}` : `t=${Date.now()}`;
+        const res = await fetch(`/api/smart-wallets?${qs}`, { cache: "no-store" });
         const json = await res.json();
         if (!ignore && json?.ok) {
           setError(null);
@@ -250,6 +256,21 @@ export default function SmartWalletsPage() {
             writeLocalSnapshot(next);
             return next;
           });
+          if (!force) {
+            const staleHeader = res.headers.get("X-Smart-Stale") === "1";
+            const sourceHeader = res.headers.get("X-Smart-Source") || "";
+            const snapshotAgeMs = json?.timestamp ? Date.now() - new Date(json.timestamp).getTime() : Number.POSITIVE_INFINITY;
+            const shouldForce =
+              staleHeader ||
+              snapshotAgeMs > SMART_POLL_MS * 3 ||
+              sourceHeader === "postgres" ||
+              sourceHeader === "kv" ||
+              sourceHeader === "disk";
+            if (shouldForce && Date.now() - lastForceRefreshAtRef.current > SMART_FORCE_REFRESH_MIN_MS) {
+              lastForceRefreshAtRef.current = Date.now();
+              void load(true, true);
+            }
+          }
         } else if (!ignore) {
           setError(json?.error || "smart_wallets_failed");
         }
@@ -273,7 +294,8 @@ export default function SmartWalletsPage() {
   const forceRefresh = async () => {
     setRefreshing(true);
     try {
-      const res = await fetch('/api/smart-wallets?force=1');
+      lastForceRefreshAtRef.current = Date.now();
+      const res = await fetch(`/api/smart-wallets?force=1&t=${Date.now()}`, { cache: "no-store" });
       const json = await res.json();
       if (json?.ok) {
         setError(null);
