@@ -4,6 +4,9 @@ import {
   refreshAndStoreSmartSnapshotFromEvents,
   storeWalletEvents,
 } from "@/lib/trencher/helius-ingest";
+import { kvSet } from "@/lib/trencher/kv";
+
+const LIVE_SMART_AT_KEY = "trencher:live:smart:at";
 
 function isAuthorized(request: NextRequest) {
   const secret = process.env.HELIUS_WEBHOOK_SECRET || "";
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest) {
   } else {
     void refreshAndStoreSmartSnapshotFromEvents().catch(() => undefined);
   }
+  void kvSet(LIVE_SMART_AT_KEY, Date.now(), 3600).catch(() => undefined);
 
   return NextResponse.json({
     ok: true,
@@ -56,6 +60,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   const snapshot = await refreshAndStoreSmartSnapshotFromEvents();
+  void kvSet(LIVE_SMART_AT_KEY, Date.now(), 3600).catch(() => undefined);
   return NextResponse.json({
     ok: true,
     snapshotBuilt: Boolean(snapshot),

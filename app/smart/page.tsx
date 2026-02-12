@@ -617,6 +617,7 @@ export default function SmartWalletsPage() {
               </div>
               <p className="mt-1 text-xs text-white/50">
                 Showing all tracked wallets. Ranked by 24h realized + unrealized SOL estimate (sampled, not lifetime ledger).
+                {" "}Buys = buy transactions (24h), Unique tokens = distinct token mints bought.
               </p>
             </div>
 
@@ -662,7 +663,7 @@ export default function SmartWalletsPage() {
                             )}
                           </div>
                           <div className="mt-1 text-xs text-white/50">
-                            {shortAddr(wallet.wallet, 7, 7)} • Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
+                            {shortAddr(wallet.wallet, 7, 7)} • Buys (tx) {wallet.buyCount} • Unique tokens {wallet.uniqueMints} • Tx {wallet.txCount}
                             {" • "}Price coverage {formatCoveragePct(wallet.priceCoveragePct)}
                             {wallet.buyCount === 0 ? <span className="ml-2 text-white/40">• Inactive (24h)</span> : null}
                           </div>

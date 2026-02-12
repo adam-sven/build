@@ -371,7 +371,7 @@ export default function DashboardClient() {
               >
                 <div>
                   <div className="text-sm font-medium">#{idx + 1} {wallet.profile?.name || short(wallet.wallet)}</div>
-                  <div className="text-xs text-white/55">Buys {wallet.buyCount} • Mints {wallet.uniqueMints}</div>
+                  <div className="text-xs text-white/55">Buys (tx) {wallet.buyCount} • Unique tokens {wallet.uniqueMints}</div>
                 </div>
                 <AnimatedSol
                   value={wallet.totalPnlSol ?? wallet.sampledPnlSol}
