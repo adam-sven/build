@@ -753,11 +753,17 @@ function enrichWalletPnL(
     item.positions = item.positions.map((pos) => {
       const meta = mintMetaMap.get(pos.mint);
       const pxUsd = meta?.priceUsd ?? null;
-      const valueSol =
-        pos.qty > 0 && solPriceUsd && pxUsd && solPriceUsd > 0
-          ? (pos.qty * pxUsd) / solPriceUsd
-          : 0;
-      const unrealizedSol = valueSol - pos.costBasisSol;
+      const hasLivePrice =
+        pos.qty > 0 &&
+        typeof solPriceUsd === "number" &&
+        Number.isFinite(solPriceUsd) &&
+        solPriceUsd > 0 &&
+        typeof pxUsd === "number" &&
+        Number.isFinite(pxUsd) &&
+        pxUsd > 0;
+      // If we have no reliable live price, keep unrealized neutral instead of forcing a fake loss.
+      const valueSol = hasLivePrice ? (pos.qty * pxUsd) / solPriceUsd : pos.costBasisSol;
+      const unrealizedSol = hasLivePrice ? valueSol - pos.costBasisSol : 0;
       const totalSol = pos.realizedPnlSol + unrealizedSol;
       const holdSeconds = pos.firstBuyAt ? Math.max(0, nowSec - pos.firstBuyAt) : null;
 

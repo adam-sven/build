@@ -91,7 +91,20 @@ async function hydrateTopMintMeta(data: any) {
   const rows = Array.isArray(data?.topMints) ? data.topMints : [];
   const missing = rows
     .filter((r: any) => MINT_RE.test(String(r?.mint || "")))
-    .filter((r: any) => !r?.token?.name || !r?.token?.image)
+    .filter((r: any) => {
+      const token = r?.token || {};
+      const identityMissing = !token?.name || !token?.image;
+      const marketMissing =
+        token?.priceUsd === null ||
+        token?.priceUsd === undefined ||
+        token?.volume24h === null ||
+        token?.volume24h === undefined ||
+        token?.liquidityUsd === null ||
+        token?.liquidityUsd === undefined ||
+        token?.marketCapUsd === null ||
+        token?.marketCapUsd === undefined;
+      return identityMissing || marketMissing;
+    })
     .slice(0, 90);
   if (!missing.length) return data;
 

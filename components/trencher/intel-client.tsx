@@ -108,17 +108,24 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
         setData(null);
         setError(lite?.error?.message || "Failed to load token intel");
       }
+      if (!silent) setLoading(false);
 
-      // Upgrade with holders/supply details without blocking first paint.
-      const fullRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=1`);
-      const full = await fullRes.json();
-      if (full?.ok) {
-        setData(full);
-        writeSessionJson(sessionKey, full);
-      }
-      const votesRes = await fetch(`/api/ui/votes?chain=solana&mint=${targetMint}`);
-      const votes = await votesRes.json();
-      if (votes?.ok) setRecentVoters(votes.voters || []);
+      // Upgrade holders/voters in the background without blocking first paint.
+      void Promise.allSettled([
+        (async () => {
+          const fullRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=1`);
+          const full = await fullRes.json();
+          if (full?.ok) {
+            setData(full);
+            writeSessionJson(sessionKey, full);
+          }
+        })(),
+        (async () => {
+          const votesRes = await fetch(`/api/ui/votes?chain=solana&mint=${targetMint}`);
+          const votes = await votesRes.json();
+          if (votes?.ok) setRecentVoters(votes.voters || []);
+        })(),
+      ]);
     } finally {
       if (!silent) setLoading(false);
     }
