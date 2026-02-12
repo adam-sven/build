@@ -224,3 +224,47 @@ curl -H 'Authorization: Bearer <CRON_SECRET>' 'http://localhost:3000/api/cron/re
 - Social is intentionally `coming soon` in v1.
 - Signals are shown as `unknown` until confidence is high enough.
 - This is an attention filter, not financial advice.
+
+## Self-host on your Mac (no Vercel)
+
+This repo includes a local production stack with Docker:
+
+- Next app (`app`)
+- live refresh worker (`worker`)
+- Postgres (`postgres`)
+- Redis (`redis`)
+
+### 1) Prepare env
+
+```bash
+cp selfhost/.env.example selfhost/.env
+```
+
+Fill `selfhost/.env` with your real values (`HELIUS_API_KEY`, secrets, etc).
+
+### 2) Start everything
+
+```bash
+pnpm selfhost:up
+```
+
+This starts DB/cache, applies SQL migrations, then starts app + worker.
+
+### 3) Useful commands
+
+```bash
+pnpm selfhost:logs
+pnpm selfhost:down
+pnpm selfhost:migrate
+```
+
+### 4) Domain routing from Vercel registrar
+
+If domain is registered at Vercel but app is self-hosted:
+
+1. Point domain DNS `A` record (`@`) to your home public IP.
+2. Point `www` to `@` (CNAME or A).
+3. Forward router ports `80` and `443` to your Mac.
+4. Put a reverse proxy with TLS in front of `localhost:3000` (Caddy/Nginx).
+
+Without port forwarding + public IP, the domain cannot reach your Mac.

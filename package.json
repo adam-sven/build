@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint .",
     "worker:live": "node scripts/live-worker.mjs",
-    "helius:sync-wallets": "node scripts/helius-sync-webhook.mjs"
+    "helius:sync-wallets": "node scripts/helius-sync-webhook.mjs",
+    "selfhost:up": "bash scripts/selfhost/up.sh",
+    "selfhost:down": "bash scripts/selfhost/down.sh",
+    "selfhost:logs": "bash scripts/selfhost/logs.sh",
+    "selfhost:migrate": "bash scripts/selfhost/apply-migrations.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

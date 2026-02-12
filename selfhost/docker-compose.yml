@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: iamtrader-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-iamtrader}
+      POSTGRES_USER: ${POSTGRES_USER:-iamtrader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-iamtrader}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-iamtrader} -d ${POSTGRES_DB:-iamtrader}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: iamtrader-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: iamtrader-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POSTGRES_URL: postgresql://${POSTGRES_USER:-iamtrader}:${POSTGRES_PASSWORD:-iamtrader}@postgres:5432/${POSTGRES_DB:-iamtrader}
+      REDIS_URL: redis://redis:6379
+      REDIS_TLS: "false"
+    ports:
+      - "3000:3000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: iamtrader-worker
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+      LIVE_APP_URL: http://app:3000
+      REDIS_URL: redis://redis:6379
+      REDIS_TLS: "false"
+    command: ["pnpm", "worker:live"]
+
+volumes:
+  postgres_data:
+  redis_data:
