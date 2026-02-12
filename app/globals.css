@@ -261,18 +261,21 @@ body {
   color: #67e8f9 !important;
 }
 
-.reveal-on-scroll {
-  opacity: 0;
-  transform: translateY(22px) scale(0.985);
-  transition:
-    opacity 560ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
+@keyframes pageLoadFade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.reveal-on-scroll.reveal-visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+.load-in {
+  opacity: 0;
+  animation: pageLoadFade 680ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: opacity, transform;
 }
 
 .interactive-card {
@@ -289,13 +292,14 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-on-scroll,
+  .load-in,
   .interactive-card {
     transition: none !important;
     transform: none !important;
   }
 
-  .reveal-on-scroll {
+  .load-in {
+    animation: none !important;
     opacity: 1 !important;
   }
 }
