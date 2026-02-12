@@ -112,13 +112,13 @@ const formatSol = (val: number) => {
   return `${sign}${val.toFixed(2)} SOL`;
 };
 
-const formatWinRatePct = (val: number | null) => {
-  if (val === null) return "—";
+const formatWinRatePct = (val: number | null | undefined) => {
+  if (typeof val !== "number" || !Number.isFinite(val)) return "—";
   return `${(val * 100).toFixed(0)}%`;
 };
 
-const formatCoveragePct = (val: number | null) => {
-  if (val === null) return "n/a";
+const formatCoveragePct = (val: number | null | undefined) => {
+  if (typeof val !== "number" || !Number.isFinite(val)) return "n/a";
   return `${Math.max(0, Math.min(100, val * 100)).toFixed(0)}%`;
 };
 

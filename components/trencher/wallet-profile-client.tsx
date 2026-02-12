@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import AnimatedUsd from "@/components/trencher/animated-usd";
@@ -102,8 +103,8 @@ function formatDuration(seconds: number | null) {
   return `${h}h ${m}m`;
 }
 
-function formatWinRate(v: number | null) {
-  if (v === null) return "-";
+function formatWinRate(v: number | null | undefined) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "-";
   return `${(v * 100).toFixed(0)}%`;
 }
 
@@ -123,6 +124,7 @@ function formatTime(sec: number | null) {
 }
 
 export default function WalletProfileClient({ wallet }: { wallet: string }) {
+  const router = useRouter();
   const [data, setData] = useState<WalletProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -259,7 +261,20 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
             <p className="mt-1 text-xs text-white/55">PnL = realized + unrealized (SOL estimate from live USD token prices).</p>
             <div className="mt-3 space-y-2">
               {topTokens.map((item) => (
-                <div key={item.mint} className="grid grid-cols-1 gap-3 rounded-xl border border-white/10 bg-black/25 p-3 md:grid-cols-[1.3fr_1fr_1fr_1fr_auto] md:items-center">
+                <div
+                  key={item.mint}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open Intel for ${item.token.symbol || item.token.name || item.mint}`}
+                  className="grid cursor-pointer grid-cols-1 gap-3 rounded-xl border border-white/10 bg-black/25 p-3 transition-colors hover:border-emerald-300/40 hover:bg-black/35 md:grid-cols-[1.3fr_1fr_1fr_1fr_auto] md:items-center"
+                  onClick={() => router.push(`/intel?mint=${item.mint}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(`/intel?mint=${item.mint}`);
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-2">
                     {item.token.image ? (
                       <img src={item.token.image} alt={item.token.symbol || "token"} className="h-8 w-8 rounded-full border border-white/15 object-cover" />
@@ -285,10 +300,21 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
                     <div>Hold age: {formatDuration(item.sampledHoldSeconds)}</div>
                   </div>
                   <div className="flex gap-2">
-                    <Button asChild size="sm" className="h-8 bg-emerald-400 text-black hover:bg-emerald-300">
+                    <Button
+                      asChild
+                      size="sm"
+                      className="h-8 bg-emerald-400 text-black hover:bg-emerald-300"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Link href={`/intel?mint=${item.mint}`}>Intel</Link>
                     </Button>
-                    <Button asChild size="sm" variant="outline" className="h-8 border-white/20">
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-white/20"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <a href={item.token.pairUrl || `https://dexscreener.com/solana/${item.mint}`} target="_blank" rel="noreferrer">Buy</a>
                     </Button>
                   </div>
