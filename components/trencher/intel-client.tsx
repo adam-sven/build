@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AnimatedUsd from "@/components/trencher/animated-usd";
+import AnimatedNumber from "@/components/trencher/animated-number";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -422,10 +423,10 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               </Tabs>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/70 md:grid-cols-4">
-              <div>Price <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.priceUsd)}</span></div>
-              <div>24h <span className="ml-1 font-semibold text-white">{fmtPct(data.market.priceChange.h24)}</span></div>
-              <div>Liq <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.liquidityUsd)}</span></div>
-              <div>Vol <span className="ml-1 font-semibold text-white">{fmtUsd(data.market.volume24hUsd)}</span></div>
+              <div>Price <span className="ml-1 font-semibold text-white"><AnimatedUsd value={data.market.priceUsd} /></span></div>
+              <div>24h <span className="ml-1 font-semibold text-white"><AnimatedNumber value={data.market.priceChange.h24} format={(v) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`} /></span></div>
+              <div>Liq <span className="ml-1 font-semibold text-white"><AnimatedUsd value={data.market.liquidityUsd} /></span></div>
+              <div>Vol <span className="ml-1 font-semibold text-white"><AnimatedUsd value={data.market.volume24hUsd} /></span></div>
             </div>
             <div className="relative h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
               {chartSource === "native" && (
@@ -472,7 +473,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
           </section>
 
           <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
-            <Stat title="Price" value={fmtUsd(data.market.priceUsd)} />
+            <Stat title="Price" value={<AnimatedUsd value={data.market.priceUsd} />} />
             <Stat
               title="Market Cap/FDV"
               value={
@@ -481,18 +482,29 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 </span>
               }
             />
-            <Stat title="Liquidity" value={fmtUsd(data.market.liquidityUsd)} />
-            <Stat title="Volume 24h" value={fmtUsd(data.market.volume24hUsd)} />
-            <Stat title="Tx 24h" value={String(data.market.txCount24h || "-")} />
-            <Stat title="Holders" value={fmtNum(data.holders.holderCount)} />
-            <Stat title="Top 10 %" value={fmtPct(data.holders.top10Pct)} />
+            <Stat title="Liquidity" value={<AnimatedUsd value={data.market.liquidityUsd} />} />
+            <Stat title="Volume 24h" value={<AnimatedUsd value={data.market.volume24hUsd} />} />
+            <Stat title="Tx 24h" value={<AnimatedNumber value={data.market.txCount24h} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+            <Stat title="Holders" value={<AnimatedNumber value={data.holders.holderCount} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+            <Stat title="Top 10 %" value={<AnimatedNumber value={data.holders.top10Pct} format={(v) => `${v.toFixed(2)}%`} />} />
             <Stat title="DEX" value={data.market.dex || "-"} />
-            <Stat title="Searches 1h/24h" value={`${data.search.searches1h}/${data.search.searches24h}`} />
+            <Stat
+              title="Searches 1h/24h"
+              value={
+                <span>
+                  <AnimatedNumber value={data.search.searches1h} decimals={0} format={(v) => `${Math.round(v)}`} />
+                  /
+                  <AnimatedNumber value={data.search.searches24h} decimals={0} format={(v) => `${Math.round(v)}`} />
+                </span>
+              }
+            />
           </section>
 
           <section className="rounded-xl border border-white/10 bg-black/30 p-4">
             <h2 className="font-semibold">Votes</h2>
-            <div className="mt-2 text-sm text-white/70">Up {data.votes.up24h} • Down {data.votes.down24h} • Score {data.votes.score24h}</div>
+            <div className="mt-2 text-sm text-white/70">
+              Up <AnimatedNumber value={data.votes.up24h} decimals={0} format={(v) => `${Math.round(v)}`} /> • Down <AnimatedNumber value={data.votes.down24h} decimals={0} format={(v) => `${Math.round(v)}`} /> • Score <AnimatedNumber value={data.votes.score24h} decimals={0} format={(v) => `${Math.round(v)}`} />
+            </div>
             <div className="mt-3 flex gap-2">
               <Button variant="outline" className="border-white/20" onClick={() => setVoteDirection("up")}>Vote Up</Button>
               <Button variant="outline" className="border-white/20" onClick={() => setVoteDirection("down")}>Vote Down</Button>

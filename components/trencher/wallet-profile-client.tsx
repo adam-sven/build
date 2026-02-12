@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import AnimatedUsd from "@/components/trencher/animated-usd";
+import AnimatedNumber from "@/components/trencher/animated-number";
+import AnimatedSol from "@/components/trencher/animated-sol";
 
 type WalletProfile = {
   ok: boolean;
@@ -242,17 +244,17 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
       {data && (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
-            <Stat title="Total PnL" value={sol(data.summary.totalPnlSol)} tone={data.summary.totalPnlSol >= 0 ? "good" : "bad"} />
-            <Stat title="Realized" value={sol(data.summary.realizedPnlSol)} tone={data.summary.realizedPnlSol >= 0 ? "good" : "bad"} />
-            <Stat title="Unrealized" value={sol(data.summary.unrealizedPnlSol)} tone={data.summary.unrealizedPnlSol >= 0 ? "good" : "bad"} />
-            <Stat title="Buys" value={String(data.summary.buyCount)} />
-            <Stat title="Win Rate" value={formatWinRate(data.summary.winRate)} />
+            <Stat title="Total PnL" value={<AnimatedSol value={data.summary.totalPnlSol} />} tone={data.summary.totalPnlSol >= 0 ? "good" : "bad"} />
+            <Stat title="Realized" value={<AnimatedSol value={data.summary.realizedPnlSol} />} tone={data.summary.realizedPnlSol >= 0 ? "good" : "bad"} />
+            <Stat title="Unrealized" value={<AnimatedSol value={data.summary.unrealizedPnlSol} />} tone={data.summary.unrealizedPnlSol >= 0 ? "good" : "bad"} />
+            <Stat title="Buys" value={<AnimatedNumber value={data.summary.buyCount} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+            <Stat title="Win Rate" value={<AnimatedNumber value={data.summary.winRate !== null ? data.summary.winRate * 100 : null} format={(v) => `${v.toFixed(0)}%`} />} />
           </div>
           <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat title="SOL Balance" value={solAmount(data.summary.solBalance)} />
-            <Stat title="Unique tokens" value={String(data.summary.uniqueMints)} />
-            <Stat title="Transactions" value={String(data.summary.txCount)} />
-            <Stat title="Closed trades" value={String(data.summary.closedTrades)} />
+            <Stat title="SOL Balance" value={<AnimatedSol value={data.summary.solBalance} />} />
+            <Stat title="Unique tokens" value={<AnimatedNumber value={data.summary.uniqueMints} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+            <Stat title="Transactions" value={<AnimatedNumber value={data.summary.txCount} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+            <Stat title="Closed trades" value={<AnimatedNumber value={data.summary.closedTrades} decimals={0} format={(v) => `${Math.round(v)}`} />} />
             <Stat title="Last seen" value={formatTime(data.summary.lastSeen)} />
           </div>
 
@@ -287,16 +289,16 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
                     </div>
                   </div>
                   <div className="text-xs text-white/70">
-                    <div>Buys/Sells: {item.buyCount}/{item.sellCount}</div>
-                    <div>Qty: {item.qty.toFixed(2)}</div>
+                    <div>Buys/Sells: <AnimatedNumber value={item.buyCount} decimals={0} format={(v) => `${Math.round(v)}`} />/<AnimatedNumber value={item.sellCount} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
+                    <div>Qty: <AnimatedNumber value={item.qty} format={(v) => v.toFixed(2)} /></div>
                   </div>
                   <div className="text-xs text-white/70">
-                    <div>Price: {usd(item.token.priceUsd)}</div>
+                    <div>Price: <AnimatedUsd value={item.token.priceUsd} /></div>
                     <div>MC: <AnimatedUsd value={item.token.marketCapUsd} /></div>
-                    <div>PnL: <span className={item.totalPnlSol >= 0 ? "text-emerald-300" : "text-red-300"}>{sol(item.totalPnlSol)}</span></div>
+                    <div>PnL: <AnimatedSol value={item.totalPnlSol} className={item.totalPnlSol >= 0 ? "text-emerald-300" : "text-red-300"} /></div>
                   </div>
                   <div className="text-xs text-white/70">
-                    <div>Real/Unreal: {sol(item.realizedPnlSol)} / {sol(item.unrealizedPnlSol)}</div>
+                    <div>Real/Unreal: <AnimatedSol value={item.realizedPnlSol} /> / <AnimatedSol value={item.unrealizedPnlSol} /></div>
                     <div>Hold age: {formatDuration(item.sampledHoldSeconds)}</div>
                   </div>
                   <div className="flex gap-2">
@@ -329,7 +331,7 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
               {data.recentBuys.map((buy, idx) => (
                 <div key={`${buy.mint}-${idx}`} className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-lg border border-white/5 px-2 py-1 text-xs text-white/70">
                   <div>{buy.token?.symbol || short(buy.mint, 5, 5)} <span className="text-white/45">{buy.source === "holding" ? "(holding)" : ""}</span></div>
-                  <div>{buy.amount.toFixed(2)}</div>
+                  <div><AnimatedNumber value={buy.amount} format={(v) => v.toFixed(2)} /></div>
                   <div className="text-white/45">{formatTime(buy.blockTime)}</div>
                 </div>
               ))}
@@ -341,7 +343,7 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
   );
 }
 
-function Stat({ title, value, tone = "neutral" }: { title: string; value: string; tone?: "neutral" | "good" | "bad" }) {
+function Stat({ title, value, tone = "neutral" }: { title: string; value: React.ReactNode; tone?: "neutral" | "good" | "bad" }) {
   const cls = tone === "good" ? "text-emerald-300" : tone === "bad" ? "text-red-300" : "text-white";
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
