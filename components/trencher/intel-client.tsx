@@ -81,7 +81,8 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const [voteDirection, setVoteDirection] = useState<"up" | "down" | null>(null);
   const [showVoters, setShowVoters] = useState(false);
   const [recentVoters, setRecentVoters] = useState<string[]>([]);
-  const [chartSource, setChartSource] = useState<"native" | "gmgn">("gmgn");
+  const [chartSource, setChartSource] = useState<"native" | "gmgn">("native");
+  const [isLightTheme, setIsLightTheme] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestSeqRef = useRef(0);
   const mintRef = useRef(mint);
@@ -223,6 +224,15 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
     return () => clearInterval(timer);
   }, [mint, interval]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const apply = () => setIsLightTheme(root.classList.contains("trencher-light"));
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -304,7 +314,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
             const chartSeries = nativePoints;
             const gmgnSrc = `https://www.gmgn.cc/kline/sol/${data.mint}?interval=${encodeURIComponent(
               gmgnInterval(interval),
-            )}&theme=dark&chartType=line`;
+            )}&theme=${isLightTheme ? "light" : "dark"}&chartType=line`;
             return (
               <>
           <section className="rounded-xl border border-white/10 bg-black/30 p-4">
@@ -445,7 +455,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
                 />
               )}
               {chartSource === "native" && chartSeries.length > 1 && (
-                <NativeCandleChart symbol={data.identity.symbol || "TOKEN"} data={chartSeries} />
+                <NativeCandleChart symbol={data.identity.symbol || "TOKEN"} data={chartSeries} isLightTheme={isLightTheme} />
               )}
               {chartSource === "native" && chartSeries.length <= 1 && (
                 <div className="grid h-full place-items-center px-6 text-center text-sm text-white/60">

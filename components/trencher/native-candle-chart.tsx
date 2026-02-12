@@ -36,9 +36,11 @@ function fmtDate(ts: number) {
 export default function NativeCandleChart({
   symbol,
   data,
+  isLightTheme = false,
 }: {
   symbol: string;
   data: Point[];
+  isLightTheme?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -52,41 +54,81 @@ export default function NativeCandleChart({
     return map;
   }, [data]);
 
+  const palette = useMemo(
+    () =>
+      isLightTheme
+        ? {
+            bg: "#ffffff",
+            text: "#0f172a",
+            grid: "rgba(148,163,184,0.28)",
+            crosshair: "#0ea5e9",
+            crossLabelBg: "#e2e8f0",
+            scaleBorder: "rgba(15,23,42,0.18)",
+            up: "#10b981",
+            down: "#ef4444",
+            volumeUp: "rgba(16,185,129,0.35)",
+            volumeDown: "rgba(239,68,68,0.35)",
+            priceLine: "#0891b2",
+            legendBorder: "rgba(15,23,42,0.12)",
+            legendBg: "rgba(255,255,255,0.85)",
+            legendText: "#0f172a",
+            legendSubtext: "rgba(15,23,42,0.75)",
+          }
+        : {
+            bg: "#020b18",
+            text: "#94a3b8",
+            grid: "rgba(17, 66, 106, 0.35)",
+            crosshair: "#22d3ee",
+            crossLabelBg: "#0f172a",
+            scaleBorder: "rgba(148,163,184,0.2)",
+            up: "#14f1d9",
+            down: "#f8fafc",
+            volumeUp: "rgba(20,241,217,0.5)",
+            volumeDown: "rgba(248,250,252,0.45)",
+            priceLine: "#22d3ee",
+            legendBorder: "rgba(255,255,255,0.1)",
+            legendBg: "rgba(0,0,0,0.65)",
+            legendText: "rgba(255,255,255,0.9)",
+            legendSubtext: "rgba(255,255,255,0.75)",
+          },
+    [isLightTheme],
+  );
+
   useEffect(() => {
     if (!wrapRef.current) return;
 
     const chart = createChart(wrapRef.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#020b18" },
-        textColor: "#94a3b8",
+        background: { type: ColorType.Solid, color: palette.bg },
+        textColor: palette.text,
       },
       grid: {
-        vertLines: { color: "rgba(17, 66, 106, 0.35)" },
-        horzLines: { color: "rgba(17, 66, 106, 0.35)" },
+        vertLines: { color: palette.grid },
+        horzLines: { color: palette.grid },
       },
       crosshair: {
-        vertLine: { color: "#22d3ee", width: 1, style: 2, labelBackgroundColor: "#0f172a" },
-        horzLine: { color: "#22d3ee", width: 1, style: 2, labelBackgroundColor: "#0f172a" },
+        vertLine: { color: palette.crosshair, width: 1, style: 2, labelBackgroundColor: palette.crossLabelBg },
+        horzLine: { color: palette.crosshair, width: 1, style: 2, labelBackgroundColor: palette.crossLabelBg },
       },
       rightPriceScale: {
-        borderColor: "rgba(148,163,184,0.2)",
+        borderColor: palette.scaleBorder,
       },
       timeScale: {
-        borderColor: "rgba(148,163,184,0.2)",
+        borderColor: palette.scaleBorder,
         timeVisible: true,
         secondsVisible: false,
       },
     });
 
     const candle = chart.addSeries(CandlestickSeries, {
-      upColor: "#14f1d9",
-      downColor: "#f8fafc",
-      wickUpColor: "#14f1d9",
-      wickDownColor: "#f8fafc",
+      upColor: palette.up,
+      downColor: palette.down,
+      wickUpColor: palette.up,
+      wickDownColor: palette.down,
       borderVisible: false,
       priceLineVisible: true,
-      priceLineColor: "#22d3ee",
+      priceLineColor: palette.priceLine,
     });
 
     const volume = chart.addSeries(HistogramSeries, {
@@ -128,7 +170,7 @@ export default function NativeCandleChart({
       candleRef.current = null;
       volumeRef.current = null;
     };
-  }, [byTime]);
+  }, [byTime, palette]);
 
   useEffect(() => {
     const candle = candleRef.current;
@@ -146,21 +188,28 @@ export default function NativeCandleChart({
     const volumes = data.map((x) => ({
       time: x.t as UTCTimestamp,
       value: x.volume,
-      color: x.close >= x.open ? "rgba(20,241,217,0.5)" : "rgba(248,250,252,0.45)",
+      color: x.close >= x.open ? palette.volumeUp : palette.volumeDown,
     }));
     candle.setData(candles);
     volume.setData(volumes);
     chart.timeScale().fitContent();
-  }, [data]);
+  }, [data, palette]);
 
   const refPoint = hover || data[data.length - 1] || null;
 
   return (
     <div className="h-full w-full">
-      <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-[11px] text-white/80">
-        <div className="font-semibold text-white/90">{symbol}</div>
+      <div
+        className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border px-2 py-1 text-[11px]"
+        style={{
+          borderColor: palette.legendBorder,
+          background: palette.legendBg,
+          color: palette.legendSubtext,
+        }}
+      >
+        <div className="font-semibold" style={{ color: palette.legendText }}>{symbol}</div>
         {refPoint && (
-          <div className="mt-0.5 text-white/75">
+          <div className="mt-0.5">
             {fmtDate(refPoint.t)} • O {fmtNum(refPoint.open)} • H {fmtNum(refPoint.high)} • L {fmtNum(refPoint.low)} • C{" "}
             {fmtNum(refPoint.close)} • V {fmtNum(refPoint.volume)}
           </div>
