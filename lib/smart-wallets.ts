@@ -18,6 +18,7 @@ export type WalletBuy = {
 export type WalletActivity = {
   wallet: string;
   buys: WalletBuy[];
+  trades: WalletTrade[];
   solNet: number;
   txCount: number;
   lastSeen: number | null;
@@ -33,6 +34,17 @@ export type WalletActivity = {
   winRate: number | null;
   priceCoveragePct: number | null;
   positions: WalletPosition[];
+};
+
+export type WalletTrade = {
+  wallet: string;
+  mint: string;
+  side: "buy" | "sell";
+  amount: number;
+  solAmount: number;
+  signature: string;
+  blockTime: number | null;
+  source: "tx" | "holding";
 };
 
 export type TopWallet = {
@@ -419,6 +431,7 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
   );
 
   const buys: WalletBuy[] = [];
+  const trades: WalletTrade[] = [];
   let solNet = 0;
   let txCount = 0;
   let lastSeen: number | null = null;
@@ -480,6 +493,16 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
         solDelta,
         source: "tx",
       });
+      trades.push({
+        wallet,
+        mint: buy.mint,
+        side: "buy",
+        amount: buy.amount,
+        solAmount: buyCostSol,
+        signature: sig.signature,
+        blockTime,
+        source: "tx",
+      });
     }
 
     for (const sell of tokenOuts) {
@@ -501,12 +524,35 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
 
       pos.sellCount += 1;
       pos.lastTradeAt = blockTime || pos.lastTradeAt;
+      trades.push({
+        wallet,
+        mint: sell.mint,
+        side: "sell",
+        amount: recognizedQty,
+        solAmount: proceeds,
+        signature: sig.signature,
+        blockTime,
+        source: "tx",
+      });
     }
   }
 
   if (ENABLE_HOLDINGS_FALLBACK && buys.length === 0) {
     try {
-      buys.push(...(await getWalletHoldings(wallet)));
+      const holdings = await getWalletHoldings(wallet);
+      buys.push(...holdings);
+      for (const hold of holdings) {
+        trades.push({
+          wallet,
+          mint: hold.mint,
+          side: "buy",
+          amount: hold.amount,
+          solAmount: 0,
+          signature: hold.signature,
+          blockTime: hold.blockTime,
+          source: "holding",
+        });
+      }
     } catch {
       // ignore holdings fallback failures
     }
@@ -537,6 +583,7 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
   return {
     wallet,
     buys,
+    trades,
     solNet,
     txCount,
     lastSeen,
@@ -567,6 +614,7 @@ async function runInBatches(wallets: string[]): Promise<WalletActivity[]> {
           return {
             wallet,
             buys: [],
+            trades: [],
             solNet: 0,
             txCount: 0,
             lastSeen: null,
@@ -993,6 +1041,71 @@ async function writePostgresWalletPnlHourly(snapshot: SmartWalletSnapshot): Prom
   }
 }
 
+async function writePostgresWalletTrades(snapshot: SmartWalletSnapshot): Promise<void> {
+  if (!hasPostgres()) return;
+  const activity = Array.isArray(snapshot?.activity) ? snapshot.activity : [];
+  if (!activity.length) return;
+
+  const rows = activity
+    .flatMap((item) => (Array.isArray(item?.trades) ? item.trades : []))
+    .filter((row) => row?.source === "tx")
+    .filter((row) => typeof row?.wallet === "string" && row.wallet.length > 0)
+    .filter((row) => typeof row?.mint === "string" && row.mint.length > 0)
+    .filter((row) => typeof row?.signature === "string" && row.signature.length > 0)
+    .map((row) => ({
+      wallet: row.wallet,
+      mint: row.mint,
+      side: row.side,
+      amount: num(row.amount),
+      solAmount: num(row.solAmount),
+      signature: row.signature,
+      blockTime: row.blockTime ? new Date(row.blockTime * 1000).toISOString() : null,
+      snapshotAt: snapshot.timestamp || new Date().toISOString(),
+    }));
+  if (!rows.length) return;
+
+  const CHUNK_SIZE = 120;
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    const values: Array<string | number | null> = [];
+    const tuples = chunk
+      .map((row, idx) => {
+        const base = idx * 8;
+        values.push(
+          row.wallet,
+          row.signature,
+          row.mint,
+          row.side,
+          row.amount,
+          row.solAmount,
+          row.blockTime,
+          row.snapshotAt,
+        );
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8})`;
+      })
+      .join(", ");
+    try {
+      await sql.query(
+        `
+          INSERT INTO smart_wallet_trades (
+            wallet, tx_signature, mint, side, amount_token, sol_amount, block_time, snapshot_at
+          ) VALUES ${tuples}
+          ON CONFLICT (wallet, tx_signature, mint, side)
+          DO UPDATE SET
+            amount_token = EXCLUDED.amount_token,
+            sol_amount = EXCLUDED.sol_amount,
+            block_time = EXCLUDED.block_time,
+            snapshot_at = EXCLUDED.snapshot_at,
+            updated_at = NOW()
+        `,
+        values,
+      );
+    } catch {
+      // ignore postgres write failures
+    }
+  }
+}
+
 function isFresh(snapshot: SmartWalletSnapshot): boolean {
   return Date.now() - new Date(snapshot.timestamp).getTime() < CACHE_TTL;
 }
@@ -1308,6 +1421,7 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   await Promise.allSettled([
     writePostgresSnapshot(snapshot),
     writePostgresWalletPnlHourly(snapshot),
+    writePostgresWalletTrades(snapshot),
   ]);
 
   return snapshot;

@@ -101,6 +101,7 @@ Run SQL from:
 
 - `db/migrations/0001_trencher.sql`
 - `db/migrations/0002_smart_wallets.sql`
+- `db/migrations/0003_smart_wallet_trades.sql`
 
 ## API
 
