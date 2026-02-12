@@ -81,7 +81,7 @@ type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
 
 const SOURCE_META: Record<SourceFilter, { label: string; icon: string }> = {
   all: { label: "All", icon: "/source-all.svg" },
-  pumpfun: { label: "Pumpfun", icon: "/source-pumpfun.png" },
+  pumpfun: { label: "Pumpfun", icon: "/source-pumpfun-v2.png" },
   bagsapp: { label: "BagsApp", icon: "/source-bagsapp.svg" },
   other: { label: "Solana", icon: "/source-solana.svg" },
 };
