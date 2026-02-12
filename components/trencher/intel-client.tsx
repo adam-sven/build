@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,17 +82,63 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   const [recentVoters, setRecentVoters] = useState<string[]>([]);
   const [chartSource, setChartSource] = useState<"native" | "gmgn">("gmgn");
   const [error, setError] = useState<string | null>(null);
+  const requestSeqRef = useRef(0);
+  const mintRef = useRef(mint);
+  const intervalRef = useRef(interval);
+  const dataRef = useRef<TokenResponse | null>(null);
   const sampleMints = [
     "So11111111111111111111111111111111111111112",
     "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
     "DezXAZ8z7PnrnRJjz3wXBoRgixCa6nnaV8ZxLxmNdkq",
   ];
 
+  const mergeTokenData = (prev: TokenResponse | null, next: TokenResponse): TokenResponse => {
+    if (!prev || prev.mint !== next.mint) return next;
+    const market = {
+      ...prev.market,
+      ...next.market,
+      priceUsd: next.market?.priceUsd ?? prev.market?.priceUsd ?? null,
+      liquidityUsd: next.market?.liquidityUsd ?? prev.market?.liquidityUsd ?? null,
+      volume24hUsd: next.market?.volume24hUsd ?? prev.market?.volume24hUsd ?? null,
+      marketCapUsd: next.market?.marketCapUsd ?? prev.market?.marketCapUsd ?? null,
+      fdvUsd: next.market?.fdvUsd ?? prev.market?.fdvUsd ?? null,
+      dex: next.market?.dex || prev.market?.dex || null,
+      pairUrl: next.market?.pairUrl || prev.market?.pairUrl || null,
+      txCount24h: next.market?.txCount24h ?? prev.market?.txCount24h ?? null,
+      priceChange: {
+        m5: next.market?.priceChange?.m5 ?? prev.market?.priceChange?.m5 ?? null,
+        h1: next.market?.priceChange?.h1 ?? prev.market?.priceChange?.h1 ?? null,
+        h24: next.market?.priceChange?.h24 ?? prev.market?.priceChange?.h24 ?? null,
+      },
+    };
+    return {
+      ...prev,
+      ...next,
+      identity: {
+        ...prev.identity,
+        ...next.identity,
+        name: next.identity?.name || prev.identity?.name || null,
+        symbol: next.identity?.symbol || prev.identity?.symbol || null,
+        image: next.identity?.image || prev.identity?.image || null,
+      },
+      market,
+      holders: next.holders || prev.holders,
+      signals: next.signals || prev.signals,
+      votes: next.votes || prev.votes,
+      search: next.search || prev.search,
+      candles:
+        Array.isArray(next.candles?.items) && next.candles.items.length > 0
+          ? next.candles
+          : prev.candles,
+    };
+  };
+
   const load = async (targetMint: string, targetInterval: Interval, silent = false) => {
     if (!targetMint) return;
+    const requestSeq = ++requestSeqRef.current;
     const sessionKey = `trencher:intel:${targetMint}:${targetInterval}:v1`;
     const cached = readSessionJson<TokenResponse>(sessionKey);
-    if (cached?.ok) {
+    if (!silent && !dataRef.current && cached?.ok) {
       setData(cached);
     }
     if (!silent) setLoading(true);
@@ -100,12 +146,15 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
     try {
       const liteRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=0`);
       const lite = await liteRes.json();
-      if (lite?.ok) {
-        setData(lite);
+      const stale =
+        requestSeq !== requestSeqRef.current ||
+        mintRef.current !== targetMint ||
+        intervalRef.current !== targetInterval;
+      if (!stale && lite?.ok) {
+        setData((prev) => mergeTokenData(prev, lite));
         writeSessionJson(sessionKey, lite);
         router.replace(`/intel?mint=${targetMint}`);
-      } else if (!silent) {
-        setData(null);
+      } else if (!silent && !dataRef.current) {
         setError(lite?.error?.message || "Failed to load token intel");
       }
       if (!silent) setLoading(false);
@@ -115,8 +164,12 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
         (async () => {
           const fullRes = await fetch(`/api/ui/token?chain=solana&mint=${targetMint}&interval=${targetInterval}&includeHolders=1`);
           const full = await fullRes.json();
-          if (full?.ok) {
-            setData(full);
+          const fullStale =
+            requestSeq !== requestSeqRef.current ||
+            mintRef.current !== targetMint ||
+            intervalRef.current !== targetInterval;
+          if (!fullStale && full?.ok) {
+            setData((prev) => mergeTokenData(prev, full));
             writeSessionJson(sessionKey, full);
           }
         })(),
@@ -130,6 +183,18 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
       if (!silent) setLoading(false);
     }
   };
+
+  useEffect(() => {
+    mintRef.current = mint;
+  }, [mint]);
+
+  useEffect(() => {
+    intervalRef.current = interval;
+  }, [interval]);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   useEffect(() => {
     if (mint) {
