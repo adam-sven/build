@@ -10,7 +10,7 @@ export default function TrencherGlobalSearch() {
   const pathname = usePathname();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
-  const showSearch = pathname !== "/";
+  const showSearch = pathname !== "/" && pathname !== "/intel";
 
   if (!showSearch) return null;
 
