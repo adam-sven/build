@@ -459,7 +459,7 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
               <div>Liq <span className="ml-1 font-semibold text-white"><AnimatedUsd value={data.market.liquidityUsd} /></span></div>
               <div>Vol <span className="ml-1 font-semibold text-white"><AnimatedUsd value={data.market.volume24hUsd} /></span></div>
             </div>
-            <div className="relative h-[360px] overflow-hidden rounded-lg border border-white/10 bg-black/20">
+            <div className="relative h-[460px] overflow-hidden rounded-lg border border-white/10 bg-black/20 md:h-[540px]">
               {chartSource === "native" && (
                 <div className="pointer-events-none absolute left-2 top-2 z-10 rounded-md border border-white/10 bg-black/65 px-2 py-1 text-[11px] text-white/75">
                   {data.identity.symbol || "TOKEN"} • {fmtUsd(data.market.priceUsd)} • 5m {fmtPct(data.market.priceChange.m5)} • 1h {fmtPct(data.market.priceChange.h1)} • 24h {fmtPct(data.market.priceChange.h24)}
