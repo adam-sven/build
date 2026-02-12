@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
 import AnimatedUsd from '@/components/trencher/animated-usd';
+import AnimatedSol from '@/components/trencher/animated-sol';
 import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
 type WalletBuy = {
@@ -231,6 +232,11 @@ export default function SmartWalletsPage() {
             const prevCount = snapshotRowCount(prev);
             const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
             let next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
+            const prevTopWallets = Array.isArray(prev?.topWallets) ? prev.topWallets : [];
+            const nextTopWallets = Array.isArray(next?.topWallets) ? next.topWallets : [];
+            if (prevTopWallets.length >= 10 && nextTopWallets.length < Math.max(5, Math.floor(prevTopWallets.length * 0.6))) {
+              next = { ...next, topWallets: prevTopWallets };
+            }
             const prevTopMints = Array.isArray(prev?.topMints) ? prev.topMints : [];
             const nextTopMints = Array.isArray(next?.topMints) ? next.topMints : [];
             if (prevTopMints.length >= 6 && nextTopMints.length < 3) {
@@ -271,6 +277,11 @@ export default function SmartWalletsPage() {
           const prevCount = snapshotRowCount(prev);
           const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
           let next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
+          const prevTopWallets = Array.isArray(prev?.topWallets) ? prev.topWallets : [];
+          const nextTopWallets = Array.isArray(next?.topWallets) ? next.topWallets : [];
+          if (prevTopWallets.length >= 10 && nextTopWallets.length < Math.max(5, Math.floor(prevTopWallets.length * 0.6))) {
+            next = { ...next, topWallets: prevTopWallets };
+          }
           const prevTopMints = Array.isArray(prev?.topMints) ? prev.topMints : [];
           const nextTopMints = Array.isArray(next?.topMints) ? next.topMints : [];
           if (prevTopMints.length >= 6 && nextTopMints.length < 3) {
@@ -537,9 +548,10 @@ export default function SmartWalletsPage() {
                             {wallet.buyCount === 0 ? <span className="ml-2 text-white/40">• Inactive (24h)</span> : null}
                           </div>
                         </div>
-                        <div className={`text-sm font-semibold ${(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                          {formatSol(wallet.totalPnlSol ?? wallet.sampledPnlSol)}
-                        </div>
+                        <AnimatedSol
+                          value={wallet.totalPnlSol ?? wallet.sampledPnlSol}
+                          className={`text-sm font-semibold ${(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}
+                        />
                       </div>
                     </button>
 
@@ -547,8 +559,8 @@ export default function SmartWalletsPage() {
                       <div className="px-4 pb-4">
                         <div className="rounded-xl border border-white/10 bg-black/25 p-3">
                           <div className="mb-2 grid grid-cols-2 gap-2 text-[11px] text-white/70">
-                            <div>Realized: <span className={(wallet.realizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSol(wallet.realizedPnlSol || 0)}</span></div>
-                            <div>Unrealized: <span className={(wallet.unrealizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSol(wallet.unrealizedPnlSol || 0)}</span></div>
+                            <div>Realized: <AnimatedSol value={wallet.realizedPnlSol || 0} className={(wallet.realizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"} /></div>
+                            <div>Unrealized: <AnimatedSol value={wallet.unrealizedPnlSol || 0} className={(wallet.unrealizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"} /></div>
                             <div>Win rate: <span className="text-white/85">{formatWinRatePct(wallet.winRate)}</span></div>
                             <div>Closed trades: <span className="text-white/85">{wallet.closedTrades || 0}</span></div>
                             <div>Price coverage: <span className="text-white/85">{formatCoveragePct(wallet.priceCoveragePct)}</span></div>

@@ -339,12 +339,17 @@ function chooseBestSnapshot(
 function hasDetailedWalletMetrics(snapshot: any, expectedWalletCount: number): boolean {
   if (!snapshot || Number(snapshot?.stats?.totalWallets || 0) < expectedWalletCount) return false;
   const activity = Array.isArray(snapshot?.activity) ? snapshot.activity : [];
-  const hasPositionArrays = activity.some((a: any) => Array.isArray(a?.positions));
+  const withPositions = activity.filter((a: any) => Array.isArray(a?.positions));
+  const hasPositionArrays = withPositions.length >= Math.max(3, Math.floor(expectedWalletCount * 0.2));
   const topWallets = Array.isArray(snapshot?.topWallets) ? snapshot.topWallets : [];
-  const hasClosedTradeMetric = topWallets.some((w: any) => Number.isFinite(Number(w?.closedTrades)));
-  const hasExplicitWinRate = topWallets.some((w: any) => Number.isFinite(Number(w?.winRate)));
-  const hasCoverage = topWallets.some((w: any) => w?.priceCoveragePct === null || Number.isFinite(Number(w?.priceCoveragePct)));
-  return hasPositionArrays && (hasClosedTradeMetric || hasExplicitWinRate || hasCoverage);
+  const hasPnLFields = topWallets.some(
+    (w: any) =>
+      Number.isFinite(Number(w?.realizedPnlSol)) ||
+      Number.isFinite(Number(w?.unrealizedPnlSol)) ||
+      Number.isFinite(Number(w?.totalPnlSol)),
+  );
+  const hasCoverage = topWallets.some((w: any) => Number.isFinite(Number(w?.priceCoveragePct)));
+  return hasPositionArrays && (hasPnLFields || hasCoverage);
 }
 
 function normalizeSmartLists(data: any) {
@@ -498,6 +503,15 @@ export async function GET(request: NextRequest) {
       const prevTop = Array.isArray(hydratedCache.data?.topMints) ? hydratedCache.data.topMints : [];
       if (prevTop.length >= MIN_TOP_MINT_ROWS) {
         fastHydrated.topMints = prevTop;
+      }
+    }
+    if (hydratedCache && Array.isArray(fastHydrated?.topWallets)) {
+      const prevWallets = Array.isArray(hydratedCache.data?.topWallets) ? hydratedCache.data.topWallets : [];
+      const nextWallets = fastHydrated.topWallets;
+      const severeWalletDrop =
+        prevWallets.length >= 10 && nextWallets.length < Math.max(5, Math.floor(prevWallets.length * 0.6));
+      if (severeWalletDrop) {
+        fastHydrated.topWallets = prevWallets;
       }
     }
     hydratedCache = { at: now, fingerprint: fp, data: fastHydrated };

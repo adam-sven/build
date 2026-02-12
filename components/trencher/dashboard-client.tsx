@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AnimatedUsd from "@/components/trencher/animated-usd";
+import AnimatedSol from "@/components/trencher/animated-sol";
 import type { DiscoverResponse, TokenResponse } from "@/lib/trencher/types";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import {
@@ -363,10 +364,10 @@ export default function DashboardClient() {
                   <div className="text-sm font-medium">#{idx + 1} {wallet.profile?.name || short(wallet.wallet)}</div>
                   <div className="text-xs text-white/55">Buys {wallet.buyCount} • Mints {wallet.uniqueMints}</div>
                 </div>
-                <div className={(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? "text-sm text-emerald-300" : "text-sm text-red-300"}>
-                  {(wallet.totalPnlSol ?? wallet.sampledPnlSol) > 0 ? "+" : ""}
-                  {(wallet.totalPnlSol ?? wallet.sampledPnlSol).toFixed(2)} SOL
-                </div>
+                <AnimatedSol
+                  value={wallet.totalPnlSol ?? wallet.sampledPnlSol}
+                  className={(wallet.totalPnlSol ?? wallet.sampledPnlSol) >= 0 ? "text-sm text-emerald-300" : "text-sm text-red-300"}
+                />
               </Link>
             ))}
             {!loading && topWallets.length === 0 && <p className="text-sm text-white/60">No trader data yet.</p>}
