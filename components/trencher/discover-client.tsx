@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AnimatedUsd from "@/components/trencher/animated-usd";
+import AnimatedNumber from "@/components/trencher/animated-number";
 import type { DiscoverMode, DiscoverResponse, TokenRowSummary } from "@/lib/trencher/types";
 import VoteModal from "@/components/trencher/vote-modal";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
@@ -71,10 +72,29 @@ function fmtPrice(item: TokenRowSummary) {
   return `$${v.toFixed(4)}`;
 }
 
+function fmtPriceValue(v: number) {
+  if (!Number.isFinite(v) || v <= 0) return "-";
+  if (v < 0.0001) return `$${v.toFixed(8)}`;
+  if (v < 1) return `$${v.toFixed(6)}`;
+  return `$${v.toFixed(4)}`;
+}
+
 function fmtTx(v: number | null) {
   if (v === null) return "-";
   if (v > 1000) return `${(v / 1000).toFixed(1)}k`;
   return String(v);
+}
+
+function fmtTxValue(v: number) {
+  if (!Number.isFinite(v)) return "-";
+  if (v > 1000) return `${(v / 1000).toFixed(1)}k`;
+  return `${Math.round(v)}`;
+}
+
+function fmtPctValue(v: number) {
+  if (!Number.isFinite(v)) return "-";
+  const s = v > 0 ? "+" : "";
+  return `${s}${v.toFixed(2)}%`;
 }
 
 type SourceFilter = "all" | "pumpfun" | "bagsapp" | "other";
@@ -259,17 +279,27 @@ export default function DiscoverClient() {
                 </div>
               </div>
             </div>
-            <div className="col-span-1 text-[11px]">{fmtPrice(item)}</div>
-            <div className="col-span-1 text-[11px]">{fmtTx(item.txCount24h)}</div>
-            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.m5)}`}>{pct(item.priceChange.m5)}</div>
-            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.h1)}`}>{pct(item.priceChange.h1)}</div>
-            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.h24)}`}>{pct(item.priceChange.h24)}</div>
-            <div className="col-span-1 text-[11px]">{usd(item.liquidityUsd)}</div>
+            <div className="col-span-1 text-[11px]">
+              <AnimatedNumber value={item.priceUsd} format={fmtPriceValue} />
+            </div>
+            <div className="col-span-1 text-[11px]">
+              <AnimatedNumber value={item.txCount24h} format={fmtTxValue} />
+            </div>
+            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.m5)}`}>
+              <AnimatedNumber value={item.priceChange.m5} format={fmtPctValue} />
+            </div>
+            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.h1)}`}>
+              <AnimatedNumber value={item.priceChange.h1} format={fmtPctValue} />
+            </div>
+            <div className={`col-span-1 text-[11px] ${pctTone(item.priceChange.h24)}`}>
+              <AnimatedNumber value={item.priceChange.h24} format={fmtPctValue} />
+            </div>
+            <div className="col-span-1 text-[11px]"><AnimatedUsd value={item.liquidityUsd} /></div>
             <div className="col-span-1 text-[11px]">
               <AnimatedUsd value={item.marketCapUsd} />
             </div>
             <div className="col-span-1 text-[11px]">
-              <div className="mb-1">{item.votes.score24h}</div>
+              <div className="mb-1"><AnimatedNumber value={item.votes.score24h} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" className="h-6 border-white/20 px-2 text-[10px]" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>▲</Button>
                 <Button size="sm" variant="outline" className="h-6 border-white/20 px-2 text-[10px]" onClick={() => setVoteTarget({ mint: item.mint, direction: "down" })}>▼</Button>
@@ -302,16 +332,16 @@ export default function DiscoverClient() {
                 </button>
                 </div>
               </div>
-              <div className="text-xs">{item.votes.score24h}</div>
+              <div className="text-xs"><AnimatedNumber value={item.votes.score24h} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-white/70">
-              <div>Price {fmtPrice(item)}</div>
-              <div>Liq {usd(item.liquidityUsd)}</div>
-              <div>Vol {usd(item.volume24hUsd)}</div>
+              <div>Price <AnimatedNumber value={item.priceUsd} format={fmtPriceValue} /></div>
+              <div>Liq <AnimatedUsd value={item.liquidityUsd} /></div>
+              <div>Vol <AnimatedUsd value={item.volume24hUsd} /></div>
               <div>MC <AnimatedUsd value={item.marketCapUsd} /></div>
-              <div className={pctTone(item.priceChange.m5)}>5m {pct(item.priceChange.m5)}</div>
-              <div className={pctTone(item.priceChange.h1)}>1h {pct(item.priceChange.h1)}</div>
-              <div className={pctTone(item.priceChange.h24)}>24h {pct(item.priceChange.h24)}</div>
+              <div className={pctTone(item.priceChange.m5)}>5m <AnimatedNumber value={item.priceChange.m5} format={fmtPctValue} /></div>
+              <div className={pctTone(item.priceChange.h1)}>1h <AnimatedNumber value={item.priceChange.h1} format={fmtPctValue} /></div>
+              <div className={pctTone(item.priceChange.h24)}>24h <AnimatedNumber value={item.priceChange.h24} format={fmtPctValue} /></div>
             </div>
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="outline" className="h-7 border-white/20" onClick={() => setVoteTarget({ mint: item.mint, direction: "up" })}>Upvote</Button>

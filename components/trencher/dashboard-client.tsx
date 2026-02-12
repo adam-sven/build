@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AnimatedUsd from "@/components/trencher/animated-usd";
 import AnimatedSol from "@/components/trencher/animated-sol";
+import AnimatedNumber from "@/components/trencher/animated-number";
 import type { DiscoverResponse, TokenResponse } from "@/lib/trencher/types";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 import {
@@ -95,6 +96,12 @@ function usd(v: number | null) {
 
 function pct(v: number | null) {
   if (v === null) return "-";
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(2)}%`;
+}
+
+function fmtPct(v: number) {
+  if (!Number.isFinite(v)) return "-";
   const sign = v > 0 ? "+" : "";
   return `${sign}${v.toFixed(2)}%`;
 }
@@ -300,9 +307,9 @@ export default function DashboardClient() {
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Metric title="Trending tokens" value={String(discover?.items?.length || 0)} />
-        <Metric title="Smart wallets" value={String(smart?.stats?.totalWallets || smart?.topWallets?.length || 0)} />
-        <Metric title="Tracked mints" value={String(smart?.topMints?.length || 0)} />
+        <Metric title="Trending tokens" valueNode={<AnimatedNumber value={discover?.items?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+        <Metric title="Smart wallets" valueNode={<AnimatedNumber value={smart?.stats?.totalWallets || smart?.topWallets?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+        <Metric title="Tracked mints" valueNode={<AnimatedNumber value={smart?.topMints?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
         <Metric title="Updated" value={smart?.timestamp ? new Date(smart.timestamp).toLocaleTimeString() : "-"} />
       </div>
       {error && (
@@ -336,10 +343,10 @@ export default function DashboardClient() {
                 </div>
                 <div className="text-right text-xs">
                   <div className={item.priceChange.h24 && item.priceChange.h24 > 0 ? "text-emerald-300" : "text-red-300"}>
-                    {pct(item.priceChange.h24)}
+                    <AnimatedNumber value={item.priceChange.h24} format={fmtPct} />
                   </div>
                   <div className="text-white/55">MC <AnimatedUsd value={item.marketCapUsd} /></div>
-                  <div className="text-white/45">Vol {usd(item.volume24hUsd)}</div>
+                  <div className="text-white/45">Vol <AnimatedUsd value={item.volume24hUsd} /></div>
                 </div>
               </Link>
             ))}
@@ -457,11 +464,11 @@ export default function DashboardClient() {
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/70">
                   <div>MC <AnimatedUsd value={item.marketCapUsd} /></div>
-                  <div>Vol {usd(item.volume24hUsd)}</div>
+                  <div>Vol <AnimatedUsd value={item.volume24hUsd} /></div>
                 </div>
                 <div className="mt-1 text-xs">
                   <span className={item.change24h !== null && item.change24h >= 0 ? "text-emerald-300" : "text-red-300"}>
-                    {pct(item.change24h)}
+                    <AnimatedNumber value={item.change24h} format={fmtPct} />
                   </span>
                   <span className="ml-2 text-white/50">{item.bonded ? "Bonded" : "Pre-bonded"}</span>
                 </div>
@@ -475,11 +482,11 @@ export default function DashboardClient() {
   );
 }
 
-function Metric({ title, value }: { title: string; value: string }) {
+function Metric({ title, value, valueNode }: { title: string; value?: string; valueNode?: ReactNode }) {
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2">
       <div className="text-[11px] uppercase tracking-wide text-white/50">{title}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
+      <div className="mt-1 text-lg font-semibold">{valueNode ?? value ?? "-"}</div>
     </div>
   );
 }

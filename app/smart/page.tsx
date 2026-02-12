@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
 import AnimatedUsd from '@/components/trencher/animated-usd';
 import AnimatedSol from '@/components/trencher/animated-sol';
+import AnimatedNumber from '@/components/trencher/animated-number';
 import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
 type WalletBuy = {
@@ -539,23 +540,23 @@ export default function SmartWalletsPage() {
           <div className="mb-5 grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wider text-white/45">Tracked wallets</div>
-              <div className="text-lg font-semibold">{data.stats.totalWallets}</div>
+              <div className="text-lg font-semibold"><AnimatedNumber value={data.stats.totalWallets} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wider text-white/45">Active (24h)</div>
-              <div className="text-lg font-semibold">{data.stats.activeWallets}</div>
+              <div className="text-lg font-semibold"><AnimatedNumber value={data.stats.activeWallets} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wider text-white/45">Shown in list</div>
-              <div className="text-lg font-semibold">{wallets.length}</div>
+              <div className="text-lg font-semibold"><AnimatedNumber value={wallets.length} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wider text-white/45">Buys Seen</div>
-              <div className="text-lg font-semibold">{data.stats.totalBuys}</div>
+              <div className="text-lg font-semibold"><AnimatedNumber value={data.stats.totalBuys} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
               <div className="text-[11px] uppercase tracking-wider text-white/45">Tracked Mints</div>
-              <div className="text-lg font-semibold">{data.stats.totalTrackedMints}</div>
+              <div className="text-lg font-semibold"><AnimatedNumber value={data.stats.totalTrackedMints} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
           </div>
         )}
@@ -726,7 +727,7 @@ export default function SmartWalletsPage() {
                             <span className="ml-1 text-white/45">{token.token.name || shortAddr(token.mint, 6, 6)}</span>
                           </div>
                           <div className="mt-0.5 truncate text-[11px] text-white/55">
-                            {token.walletCount}w • {token.buyCount}b • MCap <AnimatedUsd value={token.token.marketCapUsd} /> • Vol {formatUsd(token.token.volume24h)} • Liq {formatUsd(token.token.liquidityUsd)}
+                            <AnimatedNumber value={token.walletCount} decimals={0} format={(v) => `${Math.round(v)}w`} /> • <AnimatedNumber value={token.buyCount} decimals={0} format={(v) => `${Math.round(v)}b`} /> • MCap <AnimatedUsd value={token.token.marketCapUsd} /> • Vol <AnimatedUsd value={token.token.volume24h} /> • Liq <AnimatedUsd value={token.token.liquidityUsd} />
                           </div>
                         </div>
                         <div className={`text-sm font-semibold ${changeTone}`}>{formatPct(token.token.change24h)}</div>
