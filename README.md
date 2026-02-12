@@ -93,6 +93,7 @@ HOLDER_STATS_TTL_MS=3600000
 Run SQL from:
 
 - `db/migrations/0001_trencher.sql`
+- `db/migrations/0002_smart_wallets.sql`
 
 ## API
 

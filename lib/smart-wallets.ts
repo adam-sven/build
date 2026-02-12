@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { sql } from "@vercel/postgres";
 import { normalizeImageUrl } from "@/lib/utils";
 import { kvGet, kvIncr, kvSet } from "@/lib/trencher/kv";
 
@@ -163,9 +164,24 @@ const WALLET_PROFILES_PATH = path.join(process.cwd(), "data", "wallet-profiles.j
 const FILE_CACHE_PATH = path.join(os.tmpdir(), "smart-wallets-cache.json");
 const KV_CACHE_KEY = "trencher:smart-wallets:snapshot:v1";
 const KV_CACHE_TTL_SECONDS = Number(process.env.SMART_KV_CACHE_TTL_SEC || `${12 * 60 * 60}`);
+const SMART_SNAPSHOT_SCOPE = "smart_wallets";
 const ENABLE_HOLDINGS_FALLBACK = /^(1|true|yes)$/i.test(
   process.env.SMART_ENABLE_HOLDINGS_FALLBACK || (LOW_CREDIT_MODE ? "false" : "true"),
 );
+
+function hasPostgres() {
+  return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL);
+}
+
+function num(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function numOrNull(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 function isCompatibleSnapshot(snapshot: any): snapshot is SmartWalletSnapshot {
   if (!snapshot || typeof snapshot !== "object") return false;
@@ -836,6 +852,147 @@ async function readKvCache(): Promise<SmartWalletSnapshot | null> {
   }
 }
 
+async function readPostgresSnapshot(): Promise<SmartWalletSnapshot | null> {
+  if (!hasPostgres()) return null;
+  try {
+    const result = await sql<{ snapshot_json: unknown }>`
+      SELECT snapshot_json
+      FROM smart_snapshots
+      WHERE scope = ${SMART_SNAPSHOT_SCOPE}
+      LIMIT 1
+    `;
+    const payload = result.rows[0]?.snapshot_json;
+    if (!payload) return null;
+    const parsed = typeof payload === "string" ? JSON.parse(payload) : payload;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!isCompatibleSnapshot(parsed)) return null;
+    return parsed as SmartWalletSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+async function writePostgresSnapshot(snapshot: SmartWalletSnapshot): Promise<void> {
+  if (!hasPostgres()) return;
+  try {
+    const rowCount = snapshotRowCount(snapshot);
+    const walletCount = snapshot.wallets?.length || 0;
+    const topWalletCount = snapshot.topWallets?.length || 0;
+    const topMintCount = snapshot.topMints?.length || 0;
+    await sql`
+      INSERT INTO smart_snapshots (
+        scope, snapshot_json, row_count, wallet_count, top_wallet_count, top_mint_count, created_at, updated_at
+      ) VALUES (
+        ${SMART_SNAPSHOT_SCOPE},
+        ${JSON.stringify(snapshot)}::jsonb,
+        ${rowCount},
+        ${walletCount},
+        ${topWalletCount},
+        ${topMintCount},
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (scope)
+      DO UPDATE SET
+        snapshot_json = EXCLUDED.snapshot_json,
+        row_count = EXCLUDED.row_count,
+        wallet_count = EXCLUDED.wallet_count,
+        top_wallet_count = EXCLUDED.top_wallet_count,
+        top_mint_count = EXCLUDED.top_mint_count,
+        updated_at = NOW()
+    `;
+  } catch {
+    // ignore postgres write failures
+  }
+}
+
+async function writePostgresWalletPnlHourly(snapshot: SmartWalletSnapshot): Promise<void> {
+  if (!hasPostgres()) return;
+  const activity = Array.isArray(snapshot?.activity) ? snapshot.activity : [];
+  if (!activity.length) return;
+
+  const bucketDate = new Date(snapshot.timestamp || Date.now());
+  if (Number.isNaN(bucketDate.getTime())) return;
+  bucketDate.setMinutes(0, 0, 0);
+  const bucketIso = bucketDate.toISOString();
+
+  const rows = activity
+    .filter((item) => typeof item?.wallet === "string" && item.wallet.length > 0)
+    .map((item) => ({
+      wallet: item.wallet,
+      realizedPnlSol: num(item.realizedPnlSol),
+      unrealizedPnlSol: num(item.unrealizedPnlSol),
+      totalPnlSol: num(item.totalPnlSol),
+      costBasisSol: num(item.costBasisSol),
+      currentValueSol: num(item.currentValueSol),
+      closedTrades: Math.round(num(item.closedTrades)),
+      winningTrades: Math.round(num(item.winningTrades)),
+      buyCount: Math.round(num(item.buys?.length || 0)),
+      uniqueMints: Math.round(num(item.uniqueMints)),
+      txCount: Math.round(num(item.txCount)),
+      winRate: numOrNull(item.winRate),
+      priceCoveragePct: numOrNull(item.priceCoveragePct),
+    }));
+  if (!rows.length) return;
+
+  const CHUNK_SIZE = 60;
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    const values: Array<string | number | null> = [];
+    const tuples = chunk
+      .map((row, idx) => {
+        const base = idx * 14;
+        values.push(
+          bucketIso,
+          row.wallet,
+          row.realizedPnlSol,
+          row.unrealizedPnlSol,
+          row.totalPnlSol,
+          row.costBasisSol,
+          row.currentValueSol,
+          row.closedTrades,
+          row.winningTrades,
+          row.buyCount,
+          row.uniqueMints,
+          row.txCount,
+          row.winRate,
+          row.priceCoveragePct,
+        );
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12}, $${base + 13}, $${base + 14})`;
+      })
+      .join(", ");
+    try {
+      await sql.query(
+        `
+          INSERT INTO smart_wallet_pnl_hourly (
+            bucket_at, wallet, realized_pnl_sol, unrealized_pnl_sol, total_pnl_sol,
+            cost_basis_sol, current_value_sol, closed_trades, winning_trades,
+            buy_count, unique_mints, tx_count, win_rate, price_coverage_pct
+          ) VALUES ${tuples}
+          ON CONFLICT (bucket_at, wallet)
+          DO UPDATE SET
+            realized_pnl_sol = EXCLUDED.realized_pnl_sol,
+            unrealized_pnl_sol = EXCLUDED.unrealized_pnl_sol,
+            total_pnl_sol = EXCLUDED.total_pnl_sol,
+            cost_basis_sol = EXCLUDED.cost_basis_sol,
+            current_value_sol = EXCLUDED.current_value_sol,
+            closed_trades = EXCLUDED.closed_trades,
+            winning_trades = EXCLUDED.winning_trades,
+            buy_count = EXCLUDED.buy_count,
+            unique_mints = EXCLUDED.unique_mints,
+            tx_count = EXCLUDED.tx_count,
+            win_rate = EXCLUDED.win_rate,
+            price_coverage_pct = EXCLUDED.price_coverage_pct,
+            updated_at = NOW()
+        `,
+        values,
+      );
+    } catch {
+      // ignore postgres write failures
+    }
+  }
+}
+
 function isFresh(snapshot: SmartWalletSnapshot): boolean {
   return Date.now() - new Date(snapshot.timestamp).getTime() < CACHE_TTL;
 }
@@ -848,6 +1005,8 @@ function snapshotRowCount(snapshot: SmartWalletSnapshot | null | undefined): num
 async function readBestPreviousSnapshot(): Promise<SmartWalletSnapshot | null> {
   const candidates: SmartWalletSnapshot[] = [];
   if (cache?.data && isCompatibleSnapshot(cache.data)) candidates.push(cache.data);
+  const postgresCached = await readPostgresSnapshot();
+  if (postgresCached) candidates.push(postgresCached);
   const kvCached = await readKvCache();
   if (kvCached) candidates.push(kvCached);
   const diskCached = readFileCache();
@@ -1146,6 +1305,10 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
   } catch {
     // ignore
   }
+  await Promise.allSettled([
+    writePostgresSnapshot(snapshot),
+    writePostgresWalletPnlHourly(snapshot),
+  ]);
 
   return snapshot;
 }
@@ -1168,10 +1331,16 @@ function startBackgroundRefresh() {
 export async function getSmartWalletSnapshot(): Promise<{
   data: SmartWalletSnapshot;
   stale: boolean;
-  source: "memory" | "disk" | "kv" | "fresh";
+  source: "memory" | "postgres" | "disk" | "kv" | "fresh";
 }> {
   if (cache && isFresh(cache.data)) {
     if (snapshotRowCount(cache.data) === 0) {
+      const postgresCached = await readPostgresSnapshot();
+      if (postgresCached && snapshotRowCount(postgresCached) > 0) {
+        cache = { timestamp: Date.now(), data: postgresCached };
+        void kvIncr("trencher:metrics:smart_snapshot_source:postgres", 60 * 60 * 24 * 30).catch(() => undefined);
+        return { data: postgresCached, stale: !isFresh(postgresCached), source: "postgres" };
+      }
       const kvCached = await readKvCache();
       if (kvCached && snapshotRowCount(kvCached) > 0) {
         cache = { timestamp: Date.now(), data: kvCached };
@@ -1181,6 +1350,17 @@ export async function getSmartWalletSnapshot(): Promise<{
     }
     void kvIncr("trencher:metrics:smart_snapshot_source:memory", 60 * 60 * 24 * 30).catch(() => undefined);
     return { data: cache.data, stale: false, source: "memory" };
+  }
+
+  const postgresCached = await readPostgresSnapshot();
+  if (postgresCached && snapshotRowCount(postgresCached) > 0) {
+    cache = { timestamp: Date.now(), data: postgresCached };
+    const stale = !isFresh(postgresCached);
+    if (stale) {
+      startBackgroundRefresh();
+    }
+    void kvIncr("trencher:metrics:smart_snapshot_source:postgres", 60 * 60 * 24 * 30).catch(() => undefined);
+    return { data: postgresCached, stale, source: "postgres" };
   }
 
   const kvCached = await readKvCache();
