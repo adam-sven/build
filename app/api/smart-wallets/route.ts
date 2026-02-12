@@ -20,7 +20,7 @@ const HOT_MINT_COUNT = Number(process.env.SMART_HOT_MINT_COUNT || "12");
 const HOT_MINT_TTL_MS = Number(process.env.SMART_HOT_MINT_TTL_MS || "30000");
 const TOP_MINT_MIN_WALLETS = Math.max(1, Number(process.env.SMART_TOP_MINT_MIN_WALLETS || "2"));
 const MIN_TOP_MINT_ROWS = Math.max(3, Number(process.env.SMART_MIN_TOP_MINT_ROWS || "6"));
-const DEX_TIMEOUT_MS = Number(process.env.SMART_DEX_TIMEOUT_MS || "1800");
+const DEX_TIMEOUT_MS = Number(process.env.SMART_DEX_TIMEOUT_MS || "3500");
 const hotMintCache = new Map<
   string,
   {
@@ -362,6 +362,43 @@ function normalizeSmartLists(data: any) {
   return data;
 }
 
+function mergeTopMintTokenFallbacks(next: any, prev: any) {
+  const nextRows = Array.isArray(next?.topMints) ? next.topMints : [];
+  const prevRows = Array.isArray(prev?.topMints) ? prev.topMints : [];
+  if (!nextRows.length || !prevRows.length) return next;
+
+  const prevByMint = new Map<string, any>();
+  for (const row of prevRows) {
+    const mint = String(row?.mint || "");
+    if (!mint) continue;
+    prevByMint.set(mint, row?.token || {});
+  }
+
+  for (const row of nextRows) {
+    const mint = String(row?.mint || "");
+    const oldToken = prevByMint.get(mint);
+    if (!oldToken) continue;
+    const token = row?.token || {};
+    row.token = {
+      ...oldToken,
+      ...token,
+      name: token?.name || oldToken?.name || null,
+      symbol: token?.symbol || oldToken?.symbol || null,
+      image: token?.image || oldToken?.image || null,
+      priceUsd: token?.priceUsd ?? oldToken?.priceUsd ?? null,
+      change24h: token?.change24h ?? oldToken?.change24h ?? null,
+      volume24h: token?.volume24h ?? oldToken?.volume24h ?? null,
+      liquidityUsd: token?.liquidityUsd ?? oldToken?.liquidityUsd ?? null,
+      marketCapUsd: token?.marketCapUsd ?? oldToken?.marketCapUsd ?? null,
+      fdvUsd: token?.fdvUsd ?? oldToken?.fdvUsd ?? null,
+      pairUrl: token?.pairUrl || oldToken?.pairUrl || null,
+      dex: token?.dex || oldToken?.dex || null,
+    };
+  }
+
+  return next;
+}
+
 export async function GET(request: NextRequest) {
   const ip = getIp(request);
   if (!isAllowed(ip)) {
@@ -432,6 +469,9 @@ export async function GET(request: NextRequest) {
 
     const hydrated = normalizeSmartLists(hydrateWalletProfiles(await hydrateTopMintMeta(data)));
     const fastHydrated = await applyHotMintFastLane(hydrated);
+    if (hydratedCache) {
+      mergeTopMintTokenFallbacks(fastHydrated, hydratedCache.data);
+    }
     if (
       hydratedCache &&
       Array.isArray(fastHydrated?.topMints) &&
