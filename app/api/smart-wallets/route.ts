@@ -22,7 +22,7 @@ const TOP_MINT_MIN_WALLETS = Math.max(1, Number(process.env.SMART_TOP_MINT_MIN_W
 const MIN_TOP_MINT_ROWS = Math.max(3, Number(process.env.SMART_MIN_TOP_MINT_ROWS || "6"));
 const DEX_TIMEOUT_MS = Number(process.env.SMART_DEX_TIMEOUT_MS || "3500");
 const TRIGGER_LIVE_REFRESH_ON_READ = /^(1|true|yes)$/i.test(
-  process.env.SMART_TRIGGER_LIVE_REFRESH_ON_READ || "",
+  process.env.SMART_TRIGGER_LIVE_REFRESH_ON_READ || "true",
 );
 const SMART_ROUTE_CACHE_TTL_MS = Math.max(5_000, Number(process.env.SMART_ROUTE_CACHE_TTL_MS || "12000"));
 const SMART_CACHE_CONTROL = "public, s-maxage=20, stale-while-revalidate=120";

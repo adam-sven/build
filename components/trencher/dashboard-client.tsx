@@ -311,7 +311,7 @@ export default function DashboardClient() {
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Metric title="Trending tokens" valueNode={<AnimatedNumber value={discover?.items?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
         <Metric title="Smart wallets" valueNode={<AnimatedNumber value={smart?.stats?.totalWallets || smart?.topWallets?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
-        <Metric title="Tracked mints" valueNode={<AnimatedNumber value={smart?.topMints?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
+        <Metric title="Tracked tokens" valueNode={<AnimatedNumber value={smart?.topMints?.length || 0} decimals={0} format={(v) => `${Math.round(v)}`} />} />
         <Metric title="Updated" value={smart?.timestamp ? new Date(smart.timestamp).toLocaleTimeString() : "-"} />
       </div>
       {error && (

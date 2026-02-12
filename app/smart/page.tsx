@@ -218,6 +218,8 @@ export default function SmartWalletsPage() {
   };
   const snapshotRowCount = (snapshot: SmartWalletSnapshot | null) =>
     (snapshot?.topWallets?.length || 0) + (snapshot?.topMints?.length || 0);
+  const snapshotTs = (snapshot: SmartWalletSnapshot | null) =>
+    snapshot?.timestamp ? new Date(snapshot.timestamp).getTime() : 0;
 
   useEffect(() => {
     let ignore = false;
@@ -240,7 +242,14 @@ export default function SmartWalletsPage() {
             const prevHasRows = hasSnapshotRows(prev);
             const nextCount = snapshotRowCount(json);
             const prevCount = snapshotRowCount(prev);
-            const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
+            const nextTs = snapshotTs(json);
+            const prevTs = snapshotTs(prev);
+            const isClearlyNewer = nextTs > prevTs + 30_000;
+            const severeDrop =
+              !isClearlyNewer &&
+              prevCount > 0 &&
+              nextCount > 0 &&
+              nextCount < Math.max(3, Math.floor(prevCount * 0.6));
             let next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
             const prevTopWallets = Array.isArray(prev?.topWallets) ? prev.topWallets : [];
             const nextTopWallets = Array.isArray(next?.topWallets) ? next.topWallets : [];
@@ -304,7 +313,14 @@ export default function SmartWalletsPage() {
           const prevHasRows = hasSnapshotRows(prev);
           const nextCount = snapshotRowCount(json);
           const prevCount = snapshotRowCount(prev);
-          const severeDrop = prevCount > 0 && nextCount > 0 && nextCount < Math.max(3, Math.floor(prevCount * 0.6));
+          const nextTs = snapshotTs(json);
+          const prevTs = snapshotTs(prev);
+          const isClearlyNewer = nextTs > prevTs + 30_000;
+          const severeDrop =
+            !isClearlyNewer &&
+            prevCount > 0 &&
+            nextCount > 0 &&
+            nextCount < Math.max(3, Math.floor(prevCount * 0.6));
           let next = (!nextHasRows && prevHasRows) || severeDrop ? prev : json;
           const prevTopWallets = Array.isArray(prev?.topWallets) ? prev.topWallets : [];
           const nextTopWallets = Array.isArray(next?.topWallets) ? next.topWallets : [];
@@ -588,7 +604,7 @@ export default function SmartWalletsPage() {
               <div className="text-lg font-semibold"><AnimatedNumber value={data.stats.totalBuys} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-              <div className="text-[11px] uppercase tracking-wider text-white/45">Tracked Mints</div>
+              <div className="text-[11px] uppercase tracking-wider text-white/45">Tracked Tokens</div>
               <div className="text-lg font-semibold"><AnimatedNumber value={data.stats.totalTrackedMints} decimals={0} format={(v) => `${Math.round(v)}`} /></div>
             </div>
           </div>

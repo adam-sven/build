@@ -13,7 +13,7 @@ const DISCOVER_REFRESH_MS: Record<DiscoverMode, number> = {
   new: 45_000,
   quality: 60_000,
 };
-const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || (LOW_CREDIT_MODE ? "21600000" : "7200000"));
+const SMART_REFRESH_MS = Number(process.env.SMART_REFRESH_MS || (LOW_CREDIT_MODE ? "300000" : "120000"));
 const SMART_BOOTSTRAP_ON_COLD = process.env.SMART_BOOTSTRAP_ON_COLD !== "false";
 const LIVE_LOCK_KEY = "trencher:live:refresh:lock";
 
