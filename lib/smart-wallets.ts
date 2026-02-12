@@ -277,6 +277,14 @@ function getSolDelta(tx: any, wallet: string): number {
   return (post - pre) / 1_000_000_000;
 }
 
+function getOwnedMintDelta(tx: any, wallet: string, mintTarget: string): number {
+  const pre = (tx?.meta?.preTokenBalances || []).filter((b: any) => b.owner === wallet && b?.mint === mintTarget);
+  const post = (tx?.meta?.postTokenBalances || []).filter((b: any) => b.owner === wallet && b?.mint === mintTarget);
+  const preAmt = pre.reduce((acc: number, row: any) => acc + tokenUiAmount(row), 0);
+  const postAmt = post.reduce((acc: number, row: any) => acc + tokenUiAmount(row), 0);
+  return postAmt - preAmt;
+}
+
 function tokenUiAmount(balance: any): number {
   if (!balance?.uiTokenAmount) return 0;
   const ui = balance.uiTokenAmount.uiAmount;
@@ -422,7 +430,8 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
       lastSeen = blockTime;
     }
 
-    const solDelta = getSolDelta(tx, wallet);
+    // Include WSOL token-account movement so swap proceeds/cost are captured when native SOL doesn't move.
+    const solDelta = getSolDelta(tx, wallet) + getOwnedMintDelta(tx, wallet, WSOL_MINT);
     solNet += solDelta;
     const tokenDeltas = getTokenDeltaMap(tx, wallet);
     const tokenIns: Array<{ mint: string; amount: number }> = [];
