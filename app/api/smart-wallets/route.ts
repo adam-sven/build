@@ -312,8 +312,26 @@ function snapshotRows(data: any): number {
   return w + m;
 }
 
+function hasDetailedWalletMetrics(snapshot: any, expectedWalletCount: number): boolean {
+  if (!snapshot || Number(snapshot?.stats?.totalWallets || 0) < expectedWalletCount) return false;
+  const activity = Array.isArray(snapshot?.activity) ? snapshot.activity : [];
+  const hasPositionArrays = activity.some((a: any) => Array.isArray(a?.positions));
+  const topWallets = Array.isArray(snapshot?.topWallets) ? snapshot.topWallets : [];
+  const hasClosedTradeMetric = topWallets.some((w: any) => Number.isFinite(Number(w?.closedTrades)));
+  const hasExplicitWinRate = topWallets.some((w: any) => Number.isFinite(Number(w?.winRate)));
+  const hasCoverage = topWallets.some((w: any) => w?.priceCoveragePct === null || Number.isFinite(Number(w?.priceCoveragePct)));
+  return hasPositionArrays && (hasClosedTradeMetric || hasExplicitWinRate || hasCoverage);
+}
+
 function normalizeSmartLists(data: any) {
   const topWallets = Array.isArray(data?.topWallets) ? data.topWallets : [];
+  for (const row of topWallets) {
+    if (!Number.isFinite(Number(row?.winRate))) row.winRate = null;
+    if (!Number.isFinite(Number(row?.priceCoveragePct))) row.priceCoveragePct = null;
+    if (!Number.isFinite(Number(row?.realizedPnlSol))) row.realizedPnlSol = 0;
+    if (!Number.isFinite(Number(row?.unrealizedPnlSol))) row.unrealizedPnlSol = 0;
+    if (!Number.isFinite(Number(row?.totalPnlSol))) row.totalPnlSol = Number(row?.sampledPnlSol || 0);
+  }
   topWallets.sort((a: any, b: any) => {
     const ap = Number.isFinite(Number(a?.totalPnlSol)) ? Number(a.totalPnlSol) : Number(a?.sampledPnlSol || 0);
     const bp = Number.isFinite(Number(b?.totalPnlSol)) ? Number(b.totalPnlSol) : Number(b?.sampledPnlSol || 0);
@@ -373,10 +391,8 @@ export async function GET(request: NextRequest) {
     if (webhookMode) {
       cachedWebhook = await getStoredSmartSnapshotFromEvents();
       if (cachedWebhook) {
-        const webhookWalletCount = Number(cachedWebhook?.stats?.totalWallets || 0);
-        const hasPnl = Array.isArray((cachedWebhook as any)?.activity)
-          && (cachedWebhook as any).activity.some((a: any) => Array.isArray(a?.positions));
-        if (!hasPnl || webhookWalletCount < expectedWalletCount) {
+        const webhookLooksComplete = hasDetailedWalletMetrics(cachedWebhook, expectedWalletCount);
+        if (!webhookLooksComplete) {
           // Rebuild when webhook snapshot is stale/incomplete versus local tracked wallet sources.
           void refreshAndStoreSmartSnapshotFromEvents();
         }
@@ -386,9 +402,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: polled, stale, source } = await getSmartWalletSnapshot();
-    const webhookWalletCount = Number(cachedWebhook?.stats?.totalWallets || 0);
-    const webhookRows =
-      webhookWalletCount >= expectedWalletCount ? snapshotRows(cachedWebhook) : 0;
+    const webhookRows = hasDetailedWalletMetrics(cachedWebhook, expectedWalletCount)
+      ? snapshotRows(cachedWebhook)
+      : 0;
     const polledRows = snapshotRows(polled);
     const webhookTs = cachedWebhook?.timestamp ? new Date(cachedWebhook.timestamp).getTime() : 0;
     const polledTs = polled?.timestamp ? new Date(polled.timestamp).getTime() : 0;
