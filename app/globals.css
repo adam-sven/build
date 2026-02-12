@@ -325,3 +325,63 @@ body {
 :root:not(.trencher-light) [class*="bg-emerald-500/15"] {
   background-color: rgba(34, 211, 238, 0.14) !important;
 }
+
+/* Landing page: clean light-mode skin */
+:root.trencher-light .home-landing {
+  background:
+    radial-gradient(900px 500px at 8% -20%, rgba(14, 165, 233, 0.18) 0%, transparent 55%),
+    radial-gradient(760px 480px at 90% -8%, rgba(20, 184, 166, 0.16) 0%, transparent 52%),
+    linear-gradient(180deg, #f8fcff 0%, #f4f8ff 100%);
+}
+
+:root.trencher-light .home-landing-glow {
+  background: radial-gradient(760px 300px at 50% 0%, rgba(14, 165, 233, 0.14), transparent 60%);
+}
+
+:root.trencher-light .home-landing-grid {
+  opacity: 0.25;
+  background:
+    linear-gradient(to right, rgba(14, 116, 144, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(14, 116, 144, 0.12) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+:root.trencher-light .home-heading {
+  color: #0f172a !important;
+}
+
+:root.trencher-light .home-accent {
+  color: #0284c7 !important;
+}
+
+:root.trencher-light .home-sub {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
+:root.trencher-light .home-chip {
+  border-color: rgba(14, 116, 144, 0.35) !important;
+  background: rgba(14, 116, 144, 0.1) !important;
+  color: #0369a1 !important;
+}
+
+:root.trencher-light .home-card,
+:root.trencher-light .home-panel,
+:root.trencher-light .home-step-card,
+:root.trencher-light .home-check-card,
+:root.trencher-light .home-trust-card {
+  background: rgba(255, 255, 255, 0.84) !important;
+  border-color: rgba(14, 116, 144, 0.18) !important;
+  box-shadow: 0 12px 30px rgba(2, 132, 199, 0.06);
+}
+
+:root.trencher-light .home-landing h2,
+:root.trencher-light .home-landing h3,
+:root.trencher-light .home-landing .font-semibold {
+  color: #0f172a !important;
+}
+
+:root.trencher-light .home-landing p,
+:root.trencher-light .home-landing .text-sm,
+:root.trencher-light .home-landing .text-xs {
+  color: rgba(15, 23, 42, 0.72) !important;
+}

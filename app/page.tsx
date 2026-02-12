@@ -45,20 +45,20 @@ const checks = [
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_50%_0%,rgba(34,211,238,0.12),transparent_60%),linear-gradient(to_bottom,rgba(10,18,36,0.35),transparent_35%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-40 [background:linear-gradient(to_right,rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(34,211,238,0.08)_1px,transparent_1px)] [background-size:56px_56px]" />
+    <main className="home-landing relative min-h-screen overflow-hidden">
+      <div className="home-landing-glow pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_50%_0%,rgba(34,211,238,0.12),transparent_60%),linear-gradient(to_bottom,rgba(10,18,36,0.35),transparent_35%)]" />
+      <div className="home-landing-grid pointer-events-none absolute inset-0 opacity-40 [background:linear-gradient(to_right,rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(34,211,238,0.08)_1px,transparent_1px)] [background-size:56px_56px]" />
 
       <section className="relative mx-auto w-full max-w-6xl px-4 pb-14 pt-16 md:px-8 md:pt-24">
         <div className="load-in mx-auto max-w-3xl text-center" style={{ animationDelay: "40ms" }}>
-          <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-300">
+          <span className="home-chip inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-300">
             Solana attention filter for real-time token discovery
           </span>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white md:text-6xl">
+          <h1 className="home-heading mt-5 text-4xl font-semibold tracking-tight text-white md:text-6xl">
             Signal-first Intel for
-            <span className="block text-cyan-300">iamtrader.fun</span>
+            <span className="home-accent block text-cyan-300">iamtrader.fun</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-sm text-white/70 md:text-base">
+          <p className="home-sub mx-auto mt-4 max-w-2xl text-sm text-white/70 md:text-base">
             One workspace for Discover, Smart Wallets, and Intel. Rank by market quality, search interest, and
             community voting. No pay-to-boost.
           </p>
@@ -94,7 +94,7 @@ export default function HomePage() {
               <div
                 key={item.title}
                 style={{ animationDelay: `${120 + idx * 90}ms` }}
-                className="interactive-card load-in rounded-xl border border-cyan-400/20 bg-[#060b14]/80 p-5"
+                className="home-card interactive-card load-in rounded-xl border border-cyan-400/20 bg-[#060b14]/80 p-5"
               >
                 <Icon className="h-5 w-5 text-cyan-300" />
                 <h2 className="mt-3 text-lg font-semibold text-white">{item.title}</h2>
@@ -106,7 +106,7 @@ export default function HomePage() {
       </section>
 
       <section className="relative mx-auto mt-14 w-full max-w-6xl px-4 md:px-8">
-        <div className="load-in rounded-2xl border border-cyan-400/20 bg-[#050912]/90 p-6 md:p-8" style={{ animationDelay: "360ms" }}>
+        <div className="home-panel load-in rounded-2xl border border-cyan-400/20 bg-[#050912]/90 p-6 md:p-8" style={{ animationDelay: "360ms" }}>
           <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div className="max-w-2xl">
               <h3 className="text-2xl font-semibold text-white">Three Steps to Work Fast</h3>
@@ -127,7 +127,7 @@ export default function HomePage() {
               <div
                 key={step.title}
                 style={{ animationDelay: `${460 + idx * 90}ms` }}
-                className="interactive-card load-in rounded-xl border border-white/10 bg-black/30 p-4"
+                className="home-step-card interactive-card load-in rounded-xl border border-white/10 bg-black/30 p-4"
               >
                 <div className="text-xs font-medium text-cyan-300">STEP {idx + 1}</div>
                 <div className="mt-1 text-base font-semibold text-white">{step.title}</div>
@@ -150,24 +150,24 @@ export default function HomePage() {
             <div
               key={item}
               style={{ animationDelay: `${800 + idx * 60}ms` }}
-              className="interactive-card load-in rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white/80"
+              className="home-check-card interactive-card load-in rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white/80"
             >
               {item}
             </div>
           ))}
         </div>
         <div className="mt-8 grid gap-3 md:grid-cols-3">
-          <div className="interactive-card load-in rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4" style={{ animationDelay: "1120ms" }}>
+          <div className="home-trust-card interactive-card load-in rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4" style={{ animationDelay: "1120ms" }}>
             <ShieldCheck className="h-5 w-5 text-cyan-300" />
             <div className="mt-2 text-sm font-semibold text-white">Anti-spam voting</div>
             <p className="mt-1 text-xs text-white/70">Voting requires 0.001 SOL treasury fee to reduce spam.</p>
           </div>
-          <div className="interactive-card load-in rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4" style={{ animationDelay: "1210ms" }}>
+          <div className="home-trust-card interactive-card load-in rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4" style={{ animationDelay: "1210ms" }}>
             <Bot className="h-5 w-5 text-cyan-300" />
             <div className="mt-2 text-sm font-semibold text-white">Agent-ready APIs</div>
             <p className="mt-1 text-xs text-white/70">Use `/api/discover`, `/api/token`, `/api/votes`, and docs endpoints.</p>
           </div>
-          <div className="interactive-card load-in rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4" style={{ animationDelay: "1300ms" }}>
+          <div className="home-trust-card interactive-card load-in rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4" style={{ animationDelay: "1300ms" }}>
             <Radar className="h-5 w-5 text-cyan-300" />
             <div className="mt-2 text-sm font-semibold text-white">Live shared cache</div>
             <p className="mt-1 text-xs text-white/70">Worker-first refresh keeps data warm for all users.</p>
