@@ -88,7 +88,7 @@ const SOURCE_META: Record<SourceFilter, { label: string; icon: string }> = {
 
 function SourceIcon({ source, className = "h-5 w-5" }: { source: SourceFilter; className?: string }) {
   const meta = SOURCE_META[source];
-  return <img src={meta.icon} alt={meta.label} className={`${className} shrink-0 object-contain`} />;
+  return <img src={meta.icon} alt={meta.label} className={`${className} shrink-0 object-cover`} />;
 }
 
 export default function DiscoverClient() {

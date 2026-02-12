@@ -106,8 +106,8 @@ function normalizeTsSeconds(t: number): number {
 function SourceIcon({ source }: { source: "pumpfun" | "bagsapp" | "other" }) {
   const meta = SOURCE_META[source];
   return (
-    <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-black/40">
-      <img src={meta.icon} alt={meta.label} className="h-4 w-4 object-contain" />
+    <span className="h-5 w-5 shrink-0 overflow-hidden rounded-md bg-black/40">
+      <img src={meta.icon} alt={meta.label} className="h-full w-full object-cover" />
     </span>
   );
 }
