@@ -125,6 +125,7 @@ function formatTime(sec: number | null) {
 export default function WalletProfileClient({ wallet }: { wallet: string }) {
   const [data, setData] = useState<WalletProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const sessionKey = useMemo(() => `iamtrader:wallet:${wallet}:v1`, [wallet]);
 
   const hasGoodTokenRows = (snapshot: WalletProfile | null) => {
@@ -142,20 +143,28 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
 
   useEffect(() => {
     let ignore = false;
+    let cachedOk = false;
     try {
       const cached = window.sessionStorage.getItem(sessionKey);
       if (cached) {
         const parsed = JSON.parse(cached) as WalletProfile;
-        if (parsed?.ok) setData(parsed);
+        if (parsed?.ok) {
+          setData(parsed);
+          cachedOk = true;
+        }
       }
     } catch {
       // ignore
     }
 
     const load = async () => {
-      setLoading(true);
+      if (!cachedOk) setLoading(true);
+      setError(null);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 12_000);
       try {
-        const res = await fetch(`/api/smart-wallets/wallet/${wallet}`);
+        const res = await fetch(`/api/smart-wallets/wallet/${wallet}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`wallet_profile_http_${res.status}`);
         const json = await res.json();
         if (!ignore && json?.ok) {
           setData((prev) => {
@@ -168,8 +177,13 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
             }
             return next;
           });
+        } else if (!ignore) {
+          setError("wallet_profile_failed");
         }
+      } catch {
+        if (!ignore) setError("wallet_profile_timeout");
       } finally {
+        clearTimeout(timeout);
         if (!ignore) setLoading(false);
       }
     };
@@ -217,6 +231,11 @@ export default function WalletProfileClient({ wallet }: { wallet: string }) {
       </div>
 
       {loading && <p className="text-sm text-white/60">Loading wallet profile...</p>}
+      {!loading && error && (
+        <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          Wallet profile request timed out. Try refresh.
+        </div>
+      )}
 
       {data && (
         <>

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildSmartWalletSnapshot, getSmartWalletSnapshot, loadWallets } from "@/lib/smart-wallets";
 import { runLiveRefresh } from "@/lib/trencher/live";
-import { getAssetMetadata } from "@/lib/trencher/helius";
 import {
   getStoredSmartSnapshotFromEvents,
   refreshAndStoreSmartSnapshotFromEvents,
@@ -21,6 +20,7 @@ const HOT_MINT_COUNT = Number(process.env.SMART_HOT_MINT_COUNT || "12");
 const HOT_MINT_TTL_MS = Number(process.env.SMART_HOT_MINT_TTL_MS || "30000");
 const TOP_MINT_MIN_WALLETS = Math.max(1, Number(process.env.SMART_TOP_MINT_MIN_WALLETS || "2"));
 const MIN_TOP_MINT_ROWS = Math.max(3, Number(process.env.SMART_MIN_TOP_MINT_ROWS || "6"));
+const DEX_TIMEOUT_MS = Number(process.env.SMART_DEX_TIMEOUT_MS || "1800");
 const hotMintCache = new Map<
   string,
   {
@@ -69,7 +69,7 @@ async function getJupToken(mint: string): Promise<any | null> {
         cache: "no-store",
         headers: { Accept: "application/json" },
       });
-      if (res.ok) {
+      if (res?.ok) {
         const list = await res.json();
         const next = new Map<string, any>();
         if (Array.isArray(list)) {
@@ -119,11 +119,14 @@ async function hydrateTopMintMeta(data: any) {
   const dexMap = new Map<string, any>();
   for (const batch of batches) {
     try {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      });
-      if (res.ok) {
+      const res = await Promise.race<Response | null>([
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), DEX_TIMEOUT_MS)),
+      ]);
+      if (res?.ok) {
         const json = await res.json();
         const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
         for (const pair of pairs) {
@@ -176,13 +179,9 @@ async function hydrateTopMintMeta(data: any) {
       };
       continue;
     }
-
-    const helius = await getAssetMetadata(mint);
     row.token = {
       ...row.token,
-      name: row.token?.name || helius.name,
-      symbol: row.token?.symbol || helius.symbol,
-      image: normalizeImageUrl(row.token?.image || helius.image || cdnFallback),
+      image: normalizeImageUrl(row.token?.image || cdnFallback),
     };
   }
 
@@ -216,11 +215,14 @@ async function applyHotMintFastLane(data: any) {
   for (let i = 0; i < staleMints.length; i += 25) {
     const batch = staleMints.slice(i, i + 25);
     try {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) continue;
+      const res = await Promise.race<Response | null>([
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), DEX_TIMEOUT_MS)),
+      ]);
+      if (!res?.ok) continue;
       const json = await res.json();
       const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
       for (const pair of pairs) {

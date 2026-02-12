@@ -23,13 +23,106 @@ function isLikelyMint(value: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
+const DEX_TIMEOUT_MS = Number(process.env.SMART_WALLET_DEX_TIMEOUT_MS || "1800");
+const SOL_BALANCE_TIMEOUT_MS = Number(process.env.SMART_WALLET_SOL_BAL_TIMEOUT_MS || "1500");
+const WALLET_ROUTE_CACHE_TTL_MS = Number(process.env.SMART_WALLET_ROUTE_CACHE_TTL_MS || "20000");
+const walletRouteCache = new Map<string, { at: number; data: any }>();
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | null = null;
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((resolve) => {
+      timer = setTimeout(() => resolve(fallback), ms);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function pickBestPairForMint(pairs: any[], mint: string) {
+  return pairs
+    .filter((p: any) => p?.chainId === "solana" && String(p?.baseToken?.address || "") === mint)
+    .sort((a: any, b: any) => Number(b?.liquidity?.usd || 0) - Number(a?.liquidity?.usd || 0))[0];
+}
+
+function pairToMeta(pair: any) {
+  if (!pair) return null;
+  return {
+    name: pair?.baseToken?.name || null,
+    symbol: pair?.baseToken?.symbol || null,
+    image: normalizeImageUrl(pair?.info?.imageUrl || null),
+    priceUsd: pair?.priceUsd ? Number(pair.priceUsd) : null,
+    change24h: pair?.priceChange?.h24 ?? null,
+    volume24h: pair?.volume?.h24 ?? null,
+    liquidityUsd: pair?.liquidity?.usd ?? null,
+    marketCapUsd: pair?.marketCap ?? null,
+    fdvUsd: pair?.fdv ?? null,
+    pairUrl: pair?.url || null,
+    dex: pair?.dexId || null,
+  };
+}
+
+async function fetchTokenMetaBatch(mints: string[]): Promise<Map<string, any>> {
+  const out = new Map<string, any>();
+  const unique = Array.from(new Set(mints.filter((m) => isLikelyMint(m))));
+  if (!unique.length) return out;
+
+  for (let i = 0; i < unique.length; i += 25) {
+    const batch = unique.slice(i, i + 25);
+    try {
+      const res = await withTimeout(
+        fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        }),
+        DEX_TIMEOUT_MS,
+        null as Response | null,
+      );
+      if (!res?.ok) continue;
+      const json = await res.json();
+      const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
+      for (const mint of batch) {
+        const meta = pairToMeta(pickBestPairForMint(pairs, mint));
+        if (meta) out.set(mint, meta);
+      }
+    } catch {
+      // ignore per-batch failures
+    }
+  }
+
+  return out;
+}
+
+function cacheKey(wallet: string): string {
+  return `wallet:${wallet}`;
+}
+
+function readRouteCache(wallet: string) {
+  const hit = walletRouteCache.get(cacheKey(wallet));
+  if (!hit) return null;
+  if (Date.now() - hit.at > WALLET_ROUTE_CACHE_TTL_MS) {
+    walletRouteCache.delete(cacheKey(wallet));
+    return null;
+  }
+  return hit.data;
+}
+
+function writeRouteCache(wallet: string, data: any) {
+  walletRouteCache.set(cacheKey(wallet), { at: Date.now(), data });
+}
+
 async function fetchTokenMeta(mint: string) {
   try {
-    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
+    const res = await withTimeout(
+      fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      }),
+      DEX_TIMEOUT_MS,
+      null as Response | null,
+    );
+    if (!res?.ok) return null;
     const json = await res.json();
     const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
     const pair = pairs
@@ -59,13 +152,22 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   if (!isWallet(wallet)) {
     return NextResponse.json({ ok: false, error: "invalid_wallet" }, { status: 400 });
   }
+  const cached = readRouteCache(wallet);
+  if (cached) {
+    return NextResponse.json(cached, {
+      headers: {
+        "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+        "X-Wallet-Cache": "hit",
+      },
+    });
+  }
 
   const [{ data: baseSnapshot }, webhookSnapshot, solBalance] = await Promise.all([
     getSmartWalletSnapshot(),
     process.env.SMART_USE_WEBHOOK_EVENTS !== "false"
       ? getStoredSmartSnapshotFromEvents()
       : Promise.resolve(null),
-    getSolBalance(wallet),
+    withTimeout(getSolBalance(wallet), SOL_BALANCE_TIMEOUT_MS, null),
   ]);
 
   const getWalletActivity = (snapshot: any) =>
@@ -122,8 +224,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
   }
   const mints = Array.from(new Set([...byMint.keys(), ...positionByMint.keys()])).filter((mint) => isLikelyMint(mint));
   const missing = mints.filter((mint) => !tokenMap.has(mint)).slice(0, 24);
-  const fetched = await Promise.all(missing.map(async (mint) => [mint, await fetchTokenMeta(mint)] as const));
-  for (const [mint, token] of fetched) {
+  const fetchedBatch = await fetchTokenMetaBatch(missing);
+  for (const mint of missing.slice(0, 6)) {
+    const token = fetchedBatch.get(mint) || (await fetchTokenMeta(mint));
     if (token) tokenMap.set(mint, token);
   }
 
@@ -193,7 +296,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
       token: tokenMap.get(buy.mint) || null,
     }));
 
-  return NextResponse.json({
+  const payload = {
     ok: true,
     wallet,
     profile: profile
@@ -225,5 +328,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ wa
     },
     tokens,
     recentBuys,
+  };
+  writeRouteCache(wallet, payload);
+  return NextResponse.json(payload, {
+    headers: {
+      "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+      "X-Wallet-Cache": "miss",
+    },
   });
 }

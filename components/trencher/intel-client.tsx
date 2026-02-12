@@ -140,12 +140,13 @@ export default function IntelClient({ initialMint }: { initialMint: string }) {
   }, [interval]);
 
   useEffect(() => {
-    if (initialMint) {
+    if (initialMint && initialMint !== mint) {
+      setMint(initialMint);
       const cached = readSessionJson<TokenResponse>(`trencher:intel:${initialMint}:${interval}:v1`);
       if (cached?.ok) setData(cached);
       load(initialMint, interval);
     }
-  }, [initialMint]);
+  }, [initialMint, mint, interval]);
 
   useEffect(() => {
     if (!mint) return;
