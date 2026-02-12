@@ -53,9 +53,11 @@ export default function TrencherGlobalSearch() {
             </button>
           </>
         )}
-        <div className="ml-auto hidden md:block">
-          <ConnectButton />
-        </div>
+        {showSearch && (
+          <div className="ml-auto hidden md:block">
+            <ConnectButton />
+          </div>
+        )}
       </div>
     </div>
   );

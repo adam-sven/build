@@ -22,6 +22,7 @@ const LINKS = [
 export default function TrencherNav() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const showWalletButton = pathname !== "/";
 
   return (
     <>
@@ -32,7 +33,7 @@ export default function TrencherNav() {
             <span>iamtrader.fun</span>
           </Link>
           <div className="flex items-center gap-2">
-            <ConnectButton />
+            {showWalletButton && <ConnectButton />}
             <Button
               type="button"
               variant="outline"
