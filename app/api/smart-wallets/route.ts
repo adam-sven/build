@@ -24,6 +24,9 @@ const DEX_TIMEOUT_MS = Number(process.env.SMART_DEX_TIMEOUT_MS || "3500");
 const TRIGGER_LIVE_REFRESH_ON_READ = /^(1|true|yes)$/i.test(
   process.env.SMART_TRIGGER_LIVE_REFRESH_ON_READ || "",
 );
+const SMART_ROUTE_CACHE_TTL_MS = Math.max(5_000, Number(process.env.SMART_ROUTE_CACHE_TTL_MS || "12000"));
+const SMART_CACHE_CONTROL = "public, s-maxage=20, stale-while-revalidate=120";
+let smartRouteCache: { at: number; data: any; stale: boolean; source: string } | null = null;
 const hotMintCache = new Map<
   string,
   {
@@ -440,6 +443,17 @@ export async function GET(request: NextRequest) {
   try {
     const force = request.nextUrl.searchParams.get("force") === "1";
     const webhookMode = process.env.SMART_USE_WEBHOOK_EVENTS !== "false";
+    const now = Date.now();
+    if (!force && smartRouteCache && now - smartRouteCache.at < SMART_ROUTE_CACHE_TTL_MS) {
+      return NextResponse.json(smartRouteCache.data, {
+        headers: {
+          "Cache-Control": SMART_CACHE_CONTROL,
+          "X-Smart-Stale": smartRouteCache.stale ? "1" : "0",
+          "X-Smart-Source": smartRouteCache.source,
+          "X-Smart-Cache": "memory-hit",
+        },
+      });
+    }
     if (!force && TRIGGER_LIVE_REFRESH_ON_READ) {
       void runLiveRefresh("solana", "smart");
     }
@@ -476,16 +490,17 @@ export async function GET(request: NextRequest) {
     const effectiveSource = picked.source === "webhook" ? "webhook" : source;
 
     const fp = getSnapshotFingerprint(data);
-    const now = Date.now();
+    const nowTs = Date.now();
     if (
       hydratedCache &&
       hydratedCache.fingerprint === fp &&
-      now - hydratedCache.at < HYDRATE_CACHE_TTL_MS
+      nowTs - hydratedCache.at < HYDRATE_CACHE_TTL_MS
     ) {
       const fast = await applyHotMintFastLane(hydratedCache.data);
+      smartRouteCache = { at: nowTs, data: fast, stale, source: effectiveSource };
       return NextResponse.json(fast, {
         headers: {
-          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+          "Cache-Control": SMART_CACHE_CONTROL,
           "X-Smart-Stale": stale ? "1" : "0",
           "X-Smart-Source": effectiveSource,
           "X-Smart-Hydrate": "cache+hot",
@@ -517,10 +532,11 @@ export async function GET(request: NextRequest) {
         fastHydrated.topWallets = prevWallets;
       }
     }
-    hydratedCache = { at: now, fingerprint: fp, data: fastHydrated };
+    hydratedCache = { at: nowTs, fingerprint: fp, data: fastHydrated };
+    smartRouteCache = { at: nowTs, data: fastHydrated, stale, source: effectiveSource };
     return NextResponse.json(fastHydrated, {
       headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
+        "Cache-Control": SMART_CACHE_CONTROL,
         "X-Smart-Stale": stale ? "1" : "0",
         "X-Smart-Source": effectiveSource,
         "X-Smart-Hydrate": "fresh+hot",
