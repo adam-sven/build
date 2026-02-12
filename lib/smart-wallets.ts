@@ -990,6 +990,11 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     ]),
   );
   const mintMetaMap = await mapMintMetaWithConcurrency(mintsForMeta);
+  const previousTopMintsByMint = new Map<string, TopMint["token"]>(
+    (previous?.topMints || [])
+      .filter((row) => typeof row?.mint === "string")
+      .map((row) => [String(row.mint), row.token] as const),
+  );
   const solPriceUsd = await getSolPriceUsd(mintMetaMap);
   enrichWalletPnL(mergedActivity, mintMetaMap, solPriceUsd);
 
@@ -1034,6 +1039,9 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
     })
     .slice(0, TOKEN_METADATA_LIMIT)
     .map((item) => ({
+      // Keep prior token market fields when fresh enrichment is temporarily sparse.
+      // This avoids visible "all dashes" regressions on refresh under provider hiccups.
+      // Fresh values still win whenever present.
       mint: item.mint,
       walletCount: item.walletCount,
       buyCount: item.buyCount,
@@ -1041,19 +1049,42 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       amountTotal: item.amountTotal,
       solFlow: item.solFlow,
       lastBuyAt: item.lastBuyAt || null,
-      token: mintMetaMap.get(item.mint) || {
-        name: null,
-        symbol: null,
-        image: null,
-        priceUsd: null,
-        change24h: null,
-        volume24h: null,
-        liquidityUsd: null,
-        marketCapUsd: null,
-        fdvUsd: null,
-        pairUrl: null,
-        dex: null,
-      },
+      token: (() => {
+        const next = mintMetaMap.get(item.mint) || null;
+        const prevToken = previousTopMintsByMint.get(item.mint) || null;
+        if (next && prevToken) {
+          return {
+            ...prevToken,
+            ...next,
+            name: next.name || prevToken.name || null,
+            symbol: next.symbol || prevToken.symbol || null,
+            image: next.image || prevToken.image || null,
+            priceUsd: next.priceUsd ?? prevToken.priceUsd ?? null,
+            change24h: next.change24h ?? prevToken.change24h ?? null,
+            volume24h: next.volume24h ?? prevToken.volume24h ?? null,
+            liquidityUsd: next.liquidityUsd ?? prevToken.liquidityUsd ?? null,
+            marketCapUsd: next.marketCapUsd ?? prevToken.marketCapUsd ?? null,
+            fdvUsd: next.fdvUsd ?? prevToken.fdvUsd ?? null,
+            pairUrl: next.pairUrl || prevToken.pairUrl || null,
+            dex: next.dex || prevToken.dex || null,
+          };
+        }
+        if (next) return next;
+        if (prevToken) return prevToken;
+        return {
+          name: null,
+          symbol: null,
+          image: null,
+          priceUsd: null,
+          change24h: null,
+          volume24h: null,
+          liquidityUsd: null,
+          marketCapUsd: null,
+          fdvUsd: null,
+          pairUrl: null,
+          dex: null,
+        };
+      })(),
     }))
     .sort((a, b) => {
       const aChange = typeof a.token.change24h === "number" && Number.isFinite(a.token.change24h) ? a.token.change24h : null;
