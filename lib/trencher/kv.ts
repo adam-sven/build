@@ -6,6 +6,8 @@ type MemoryValue = { value: string; expiresAt: number | null };
 const memory = new Map<string, MemoryValue>();
 let redisClient: Redis | null = null;
 let redisInitTried = false;
+let redisConnecting: Promise<void> | null = null;
+let redisReady = false;
 
 function getRedis() {
   if (redisClient) return redisClient;
@@ -27,11 +29,33 @@ function hasKv() {
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 }
 
+async function ensureRedisConnected(redis: Redis | null): Promise<Redis | null> {
+  if (!redis) return null;
+  if (redisReady || redis.status === "ready") {
+    redisReady = true;
+    return redis;
+  }
+  if (!redisConnecting) {
+    redisConnecting = redis
+      .connect()
+      .then(() => {
+        redisReady = true;
+      })
+      .catch(() => {
+        redisReady = false;
+      })
+      .finally(() => {
+        redisConnecting = null;
+      });
+  }
+  await redisConnecting;
+  return redisReady ? redis : null;
+}
+
 export async function kvGet<T>(key: string): Promise<T | null> {
-  const redis = getRedis();
+  const redis = await ensureRedisConnected(getRedis());
   if (redis) {
     try {
-      await redis.connect().catch(() => undefined);
       const raw = await redis.get(key);
       if (raw === null) return null;
       return JSON.parse(raw) as T;
@@ -58,10 +82,9 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet<T>(key: string, value: T, ttlSeconds?: number) {
-  const redis = getRedis();
+  const redis = await ensureRedisConnected(getRedis());
   if (redis) {
     try {
-      await redis.connect().catch(() => undefined);
       const raw = JSON.stringify(value);
       if (ttlSeconds) {
         await redis.set(key, raw, "EX", ttlSeconds);
@@ -89,10 +112,9 @@ export async function kvSet<T>(key: string, value: T, ttlSeconds?: number) {
 }
 
 export async function kvDel(key: string) {
-  const redis = getRedis();
+  const redis = await ensureRedisConnected(getRedis());
   if (redis) {
     try {
-      await redis.connect().catch(() => undefined);
       await redis.del(key);
       return;
     } catch {
@@ -108,10 +130,9 @@ export async function kvDel(key: string) {
 }
 
 export async function kvIncr(key: string, ttlSeconds?: number): Promise<number> {
-  const redis = getRedis();
+  const redis = await ensureRedisConnected(getRedis());
   if (redis) {
     try {
-      await redis.connect().catch(() => undefined);
       const n = await redis.incr(key);
       if (ttlSeconds && n === 1) {
         await redis.expire(key, ttlSeconds);
@@ -137,10 +158,9 @@ export async function kvIncr(key: string, ttlSeconds?: number): Promise<number> 
 }
 
 export async function kvSetNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
-  const redis = getRedis();
+  const redis = await ensureRedisConnected(getRedis());
   if (redis) {
     try {
-      await redis.connect().catch(() => undefined);
       const out = await redis.set(key, value, "EX", ttlSeconds, "NX");
       return out === "OK";
     } catch {

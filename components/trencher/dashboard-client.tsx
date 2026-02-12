@@ -19,6 +19,8 @@ import {
   YAxis,
 } from "recharts";
 
+const DASHBOARD_POLL_MS = Math.max(20_000, Number(process.env.NEXT_PUBLIC_DASHBOARD_POLL_MS || "45000"));
+
 type SmartWalletSnapshot = {
   ok: boolean;
   timestamp: string;
@@ -268,7 +270,7 @@ export default function DashboardClient() {
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       loadDashboard(true);
-    }, 15_000);
+    }, DASHBOARD_POLL_MS);
     return () => clearInterval(timer);
   }, []);
 

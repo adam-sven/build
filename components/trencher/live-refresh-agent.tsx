@@ -3,6 +3,9 @@
 import { useEffect } from "react";
 
 const TICK_MS = Number(process.env.NEXT_PUBLIC_LIVE_TICK_MS || "30000");
+const ENABLE_CLIENT_TICK = /^(1|true|yes)$/i.test(
+  process.env.NEXT_PUBLIC_ENABLE_CLIENT_TICK || "",
+);
 const LEADER_KEY = "trencher:live-tick:leader";
 const LEADER_TTL_MS = 45_000;
 
@@ -20,6 +23,7 @@ async function tick(scope: "all" | "smart" | "discover" = "all") {
 
 export default function LiveRefreshAgent() {
   useEffect(() => {
+    if (!ENABLE_CLIENT_TICK) return;
     let dead = false;
     let timer: ReturnType<typeof setInterval> | null = null;
     const tabId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

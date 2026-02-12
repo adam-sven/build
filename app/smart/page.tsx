@@ -9,6 +9,8 @@ import AnimatedSol from '@/components/trencher/animated-sol';
 import AnimatedNumber from '@/components/trencher/animated-number';
 import { readSessionJson, writeSessionJson } from '@/lib/client-cache';
 
+const SMART_POLL_MS = Math.max(20_000, Number(process.env.NEXT_PUBLIC_SMART_POLL_MS || "45000"));
+
 type WalletBuy = {
   mint: string;
   amount: number;
@@ -257,7 +259,10 @@ export default function SmartWalletsPage() {
     };
 
     load();
-    const interval = setInterval(() => load(false, true), 20_000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void load(false, true);
+    }, SMART_POLL_MS);
 
     return () => {
       ignore = true;
@@ -325,18 +330,24 @@ export default function SmartWalletsPage() {
   }, [data]);
 
   const wallets = useMemo(() => {
-    const list = [...(data?.topWallets || [])]
-      .filter((item) => {
-        const pnl = Number.isFinite(Number(item.totalPnlSol)) ? Number(item.totalPnlSol) : Number(item.sampledPnlSol || 0);
-        return Math.abs(pnl) > 0.000001;
-      })
-      .sort((a, b) => {
+    const sorted = [...(data?.topWallets || [])].sort((a, b) => {
       const aPnl = Number.isFinite(Number(a.totalPnlSol)) ? Number(a.totalPnlSol) : Number(a.sampledPnlSol || 0);
       const bPnl = Number.isFinite(Number(b.totalPnlSol)) ? Number(b.totalPnlSol) : Number(b.sampledPnlSol || 0);
       if (bPnl !== aPnl) return bPnl - aPnl;
       if ((b.buyCount || 0) !== (a.buyCount || 0)) return (b.buyCount || 0) - (a.buyCount || 0);
       return (b.uniqueMints || 0) - (a.uniqueMints || 0);
     });
+    let list = sorted.filter((item) => {
+      const pnl = Number.isFinite(Number(item.totalPnlSol)) ? Number(item.totalPnlSol) : Number(item.sampledPnlSol || 0);
+      return Math.abs(pnl) > 0.000001;
+    });
+    // Keep the table stable when price coverage temporarily collapses to zero-PnL rows.
+    if (list.length < 8 && sorted.length > list.length) {
+      const topActive = sorted.filter((item) => Number(item.buyCount || 0) > 0).slice(0, 12);
+      if (topActive.length > list.length) {
+        list = topActive;
+      }
+    }
     if (!walletFilter.trim()) return list;
     const q = walletFilter.toLowerCase();
     return list.filter((item) => {

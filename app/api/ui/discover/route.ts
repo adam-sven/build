@@ -4,6 +4,10 @@ import { err, ok, parseChain } from "@/lib/trencher/http";
 import type { DiscoverMode } from "@/lib/trencher/types";
 import { runLiveRefresh } from "@/lib/trencher/live";
 
+const TRIGGER_LIVE_REFRESH_ON_READ = /^(1|true|yes)$/i.test(
+  process.env.DISCOVER_TRIGGER_LIVE_REFRESH_ON_READ || "",
+);
+
 export async function GET(request: NextRequest) {
   const chain = parseChain(request);
   const mode = (request.nextUrl.searchParams.get("mode") || "trending") as DiscoverMode;
@@ -11,7 +15,9 @@ export async function GET(request: NextRequest) {
   if (!allowed.has(mode)) return err("provider_error", "Invalid mode", 400);
 
   try {
-    void runLiveRefresh(chain, "discover");
+    if (TRIGGER_LIVE_REFRESH_ON_READ) {
+      void runLiveRefresh(chain, "discover");
+    }
     const feed = await buildDiscoverFeed(chain, mode);
     return ok(feed);
   } catch {

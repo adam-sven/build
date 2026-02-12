@@ -14,6 +14,7 @@ import VoteModal from "@/components/trencher/vote-modal";
 import { readSessionJson, writeSessionJson } from "@/lib/client-cache";
 
 const MODES: DiscoverMode[] = ["trending", "new", "voted", "quality"];
+const DISCOVER_POLL_MS = Math.max(15_000, Number(process.env.NEXT_PUBLIC_DISCOVER_POLL_MS || "30000"));
 
 function shortMint(mint: string) {
   return `${mint.slice(0, 5)}...${mint.slice(-5)}`;
@@ -163,7 +164,7 @@ export default function DiscoverClient() {
     const timer = setInterval(async () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       await load(mode, true);
-    }, 12_000);
+    }, DISCOVER_POLL_MS);
 
     return () => clearInterval(timer);
   }, [mode]);

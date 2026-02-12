@@ -9,6 +9,7 @@ type LiveStatus = {
   smartAt: number;
   discoverAt: number;
 };
+const LIVE_STATUS_POLL_MS = Math.max(15_000, Number(process.env.NEXT_PUBLIC_LIVE_STATUS_POLL_MS || "30000"));
 
 function formatAgo(ms: number) {
   if (!Number.isFinite(ms)) return "--";
@@ -30,6 +31,7 @@ export default function LiveStatusBadge() {
     let dead = false;
 
     const load = async () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       const t0 = performance.now();
       try {
         const res = await fetch("/api/ui/live-status", { cache: "no-store" });
@@ -52,7 +54,7 @@ export default function LiveStatusBadge() {
     };
 
     void load();
-    const timer = setInterval(load, 12_000);
+    const timer = setInterval(load, LIVE_STATUS_POLL_MS);
     return () => {
       dead = true;
       clearInterval(timer);

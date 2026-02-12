@@ -21,6 +21,9 @@ const HOT_MINT_TTL_MS = Number(process.env.SMART_HOT_MINT_TTL_MS || "30000");
 const TOP_MINT_MIN_WALLETS = Math.max(1, Number(process.env.SMART_TOP_MINT_MIN_WALLETS || "2"));
 const MIN_TOP_MINT_ROWS = Math.max(3, Number(process.env.SMART_MIN_TOP_MINT_ROWS || "6"));
 const DEX_TIMEOUT_MS = Number(process.env.SMART_DEX_TIMEOUT_MS || "3500");
+const TRIGGER_LIVE_REFRESH_ON_READ = /^(1|true|yes)$/i.test(
+  process.env.SMART_TRIGGER_LIVE_REFRESH_ON_READ || "",
+);
 const hotMintCache = new Map<
   string,
   {
@@ -437,7 +440,7 @@ export async function GET(request: NextRequest) {
   try {
     const force = request.nextUrl.searchParams.get("force") === "1";
     const webhookMode = process.env.SMART_USE_WEBHOOK_EVENTS !== "false";
-    if (!force) {
+    if (!force && TRIGGER_LIVE_REFRESH_ON_READ) {
       void runLiveRefresh("solana", "smart");
     }
 
