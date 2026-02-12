@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from "next/navigation";
 import { Button } from '@/components/ui/button';
 import AnimatedUsd from '@/components/trencher/animated-usd';
@@ -180,6 +180,7 @@ export default function SmartWalletsPage() {
   const [walletFilter, setWalletFilter] = useState('');
   const [mintFilter, setMintFilter] = useState('');
   const [smartSearch, setSmartSearch] = useState("");
+  const enrichRunKeyRef = useRef<string>("");
   const sessionKey = 'trencher:smart:snapshot:v1';
   const localKey = "trencher:smart:snapshot:persist:v1";
 
@@ -368,6 +369,90 @@ export default function SmartWalletsPage() {
       return label.includes(q);
     });
   }, [data, mintFilter]);
+
+  useEffect(() => {
+    const rows = Array.isArray(data?.topMints) ? data.topMints : [];
+    if (!rows.length) return;
+    const missing = rows
+      .filter((r) => !!r?.mint)
+      .filter(
+        (r) =>
+          r.token?.marketCapUsd === null ||
+          r.token?.marketCapUsd === undefined ||
+          r.token?.volume24h === null ||
+          r.token?.volume24h === undefined ||
+          r.token?.liquidityUsd === null ||
+          r.token?.liquidityUsd === undefined,
+      )
+      .slice(0, 15);
+    if (!missing.length) return;
+
+    const runKey = missing.map((r) => r.mint).join(",");
+    if (enrichRunKeyRef.current === runKey) return;
+    enrichRunKeyRef.current = runKey;
+
+    let dead = false;
+    const run = async () => {
+      const byMint = new Map<string, any>();
+      for (let i = 0; i < missing.length; i += 8) {
+        const batch = missing.slice(i, i + 8).map((r) => r.mint);
+        try {
+          const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(",")}`, {
+            cache: "no-store",
+          });
+          if (!res.ok) continue;
+          const json = await res.json();
+          const pairs = Array.isArray(json?.pairs) ? json.pairs : [];
+          for (const mint of batch) {
+            const pair = pairs
+              .filter((p: any) => p?.chainId === "solana" && String(p?.baseToken?.address || "") === mint)
+              .sort((a: any, b: any) => Number(b?.liquidity?.usd || 0) - Number(a?.liquidity?.usd || 0))[0];
+            if (!pair) continue;
+            byMint.set(mint, {
+              priceUsd: pair?.priceUsd ? Number(pair.priceUsd) : null,
+              change24h: pair?.priceChange?.h24 ?? null,
+              volume24h: pair?.volume?.h24 ?? null,
+              liquidityUsd: pair?.liquidity?.usd ?? null,
+              marketCapUsd: pair?.marketCap ?? null,
+              fdvUsd: pair?.fdv ?? null,
+              pairUrl: pair?.url || null,
+              dex: pair?.dexId || null,
+            });
+          }
+        } catch {
+          // ignore enrichment batch failure
+        }
+      }
+
+      if (dead || byMint.size === 0) return;
+      setData((prev) => {
+        if (!prev?.ok) return prev;
+        const mergedTopMints = (prev.topMints || []).map((row) => {
+          const patch = byMint.get(row.mint);
+          if (!patch) return row;
+          return {
+            ...row,
+            token: {
+              ...row.token,
+              priceUsd: patch.priceUsd ?? row.token?.priceUsd ?? null,
+              change24h: patch.change24h ?? row.token?.change24h ?? null,
+              volume24h: patch.volume24h ?? row.token?.volume24h ?? null,
+              liquidityUsd: patch.liquidityUsd ?? row.token?.liquidityUsd ?? null,
+              marketCapUsd: patch.marketCapUsd ?? row.token?.marketCapUsd ?? null,
+              fdvUsd: patch.fdvUsd ?? row.token?.fdvUsd ?? null,
+              pairUrl: patch.pairUrl || row.token?.pairUrl || null,
+              dex: patch.dex || row.token?.dex || null,
+            },
+          };
+        });
+        return { ...prev, topMints: mergedTopMints };
+      });
+    };
+    void run();
+    return () => {
+      dead = true;
+    };
+  }, [data?.timestamp, data?.topMints?.length]);
 
   const openSmartSearch = () => {
     const q = smartSearch.trim();
