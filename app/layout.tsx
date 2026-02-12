@@ -6,6 +6,7 @@ import TrencherGlobalSearch from "@/components/trencher-global-search";
 import SolanaWalletProvider from '@/components/wallet/solana-wallet-provider'
 import ConnectButton from '@/components/wallet/connect-button'
 import LiveStatusBadge from "@/components/trencher/live-status-badge";
+import LiveRefreshAgent from "@/components/trencher/live-refresh-agent";
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 import './globals.css'
@@ -47,6 +48,7 @@ export default function RootLayout({
             {children}
           </div>
           <LiveStatusBadge />
+          <LiveRefreshAgent />
           <footer className="border-t border-white/10 bg-black/70 px-3 py-4 text-xs text-white/60 md:pl-60 md:pr-6">
             <div className="flex w-full flex-col gap-2">
               <p>iamtrader.fun is a filter for attention, not a predictor. Not financial advice.</p>
