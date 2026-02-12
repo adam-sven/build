@@ -312,7 +312,12 @@ export default function SmartWalletsPage() {
   }, [data]);
 
   const wallets = useMemo(() => {
-    const list = [...(data?.topWallets || [])].sort((a, b) => {
+    const list = [...(data?.topWallets || [])]
+      .filter((item) => {
+        const pnl = Number.isFinite(Number(item.totalPnlSol)) ? Number(item.totalPnlSol) : Number(item.sampledPnlSol || 0);
+        return Math.abs(pnl) > 0.000001;
+      })
+      .sort((a, b) => {
       const aPnl = Number.isFinite(Number(a.totalPnlSol)) ? Number(a.totalPnlSol) : Number(a.sampledPnlSol || 0);
       const bPnl = Number.isFinite(Number(b.totalPnlSol)) ? Number(b.totalPnlSol) : Number(b.sampledPnlSol || 0);
       if (bPnl !== aPnl) return bPnl - aPnl;
