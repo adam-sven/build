@@ -30,6 +30,7 @@ export type WalletActivity = {
   closedTrades: number;
   winningTrades: number;
   winRate: number | null;
+  priceCoveragePct: number | null;
   positions: WalletPosition[];
 };
 
@@ -46,6 +47,7 @@ export type TopWallet = {
   txCount: number;
   lastSeen: number | null;
   topMints: string[];
+  priceCoveragePct: number | null;
 };
 
 export type TopMint = {
@@ -523,6 +525,7 @@ async function getRecentActivity(wallet: string): Promise<WalletActivity> {
     closedTrades,
     winningTrades,
     winRate: closedTrades > 0 ? winningTrades / closedTrades : null,
+    priceCoveragePct: null,
     positions: positionRows,
   };
 }
@@ -552,6 +555,7 @@ async function runInBatches(wallets: string[]): Promise<WalletActivity[]> {
             closedTrades: 0,
             winningTrades: 0,
             winRate: null,
+            priceCoveragePct: null,
             positions: [],
           };
         }
@@ -749,6 +753,8 @@ function enrichWalletPnL(
     let realized = 0;
     let closedTrades = 0;
     let winningTrades = 0;
+    let openCostBasisTotal = 0;
+    let openCostBasisPriced = 0;
 
     item.positions = item.positions.map((pos) => {
       const meta = mintMetaMap.get(pos.mint);
@@ -766,6 +772,11 @@ function enrichWalletPnL(
       const unrealizedSol = hasLivePrice ? valueSol - pos.costBasisSol : 0;
       const totalSol = pos.realizedPnlSol + unrealizedSol;
       const holdSeconds = pos.firstBuyAt ? Math.max(0, nowSec - pos.firstBuyAt) : null;
+      const openCost = pos.qty > 0 ? Math.max(0, pos.costBasisSol || 0) : 0;
+      if (openCost > 0) {
+        openCostBasisTotal += openCost;
+        if (hasLivePrice) openCostBasisPriced += openCost;
+      }
 
       realized += pos.realizedPnlSol;
       unrealized += unrealizedSol;
@@ -791,6 +802,7 @@ function enrichWalletPnL(
     item.closedTrades = closedTrades;
     item.winningTrades = winningTrades;
     item.winRate = closedTrades > 0 ? winningTrades / closedTrades : null;
+    item.priceCoveragePct = openCostBasisTotal > 0 ? Math.max(0, Math.min(1, openCostBasisPriced / openCostBasisTotal)) : null;
   }
 }
 
@@ -985,6 +997,7 @@ async function buildSnapshotInternal(): Promise<SmartWalletSnapshot> {
       closedTrades: item.closedTrades,
       txCount: item.txCount,
       lastSeen: item.lastSeen,
+      priceCoveragePct: item.priceCoveragePct,
       topMints: Array.from(
         new Set(
           item.buys

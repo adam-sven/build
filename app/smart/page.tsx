@@ -39,6 +39,7 @@ type TopWallet = {
   txCount: number;
   lastSeen: number | null;
   topMints: string[];
+  priceCoveragePct: number | null;
   profile?: {
     rank: number | null;
     name: string | null;
@@ -114,6 +115,11 @@ const formatSol = (val: number) => {
 const formatWinRatePct = (val: number | null) => {
   if (val === null) return "—";
   return `${(val * 100).toFixed(0)}%`;
+};
+
+const formatCoveragePct = (val: number | null) => {
+  if (val === null) return "n/a";
+  return `${Math.max(0, Math.min(100, val * 100)).toFixed(0)}%`;
 };
 
 const formatUsd = (val: number | null) => {
@@ -522,6 +528,7 @@ export default function SmartWalletsPage() {
                           </div>
                           <div className="mt-1 text-xs text-white/50">
                             {shortAddr(wallet.wallet, 7, 7)} • Buys {wallet.buyCount} • Mints {wallet.uniqueMints} • Tx {wallet.txCount}
+                            {" • "}Price coverage {formatCoveragePct(wallet.priceCoveragePct)}
                             {wallet.buyCount === 0 ? <span className="ml-2 text-white/40">• Inactive (24h)</span> : null}
                           </div>
                         </div>
@@ -539,6 +546,8 @@ export default function SmartWalletsPage() {
                             <div>Unrealized: <span className={(wallet.unrealizedPnlSol || 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{formatSol(wallet.unrealizedPnlSol || 0)}</span></div>
                             <div>Win rate: <span className="text-white/85">{formatWinRatePct(wallet.winRate)}</span></div>
                             <div>Closed trades: <span className="text-white/85">{wallet.closedTrades || 0}</span></div>
+                            <div>Price coverage: <span className="text-white/85">{formatCoveragePct(wallet.priceCoveragePct)}</span></div>
+                            <div className="text-white/50">Open-position cost basis with live prices</div>
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="text-xs uppercase tracking-widest text-white/45">Recent buys</div>
